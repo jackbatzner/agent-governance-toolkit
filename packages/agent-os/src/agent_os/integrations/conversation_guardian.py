@@ -39,13 +39,64 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
+import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# ── Text Normalization (Evasion Resistance) ──────────────────────────
+
+
+_LEET_MAP: dict[str, str] = {
+    "0": "o", "1": "i", "3": "e", "4": "a", "5": "s",
+    "7": "t", "8": "b", "@": "a", "$": "s", "!": "i",
+    "+": "t", "€": "e", "¡": "i",
+}
+
+_HOMOGLYPH_MAP: dict[str, str] = {
+    "\u0430": "a", "\u0435": "e", "\u043e": "o", "\u0440": "p",
+    "\u0441": "c", "\u0443": "y", "\u0445": "x", "\u04bb": "h",
+    "\u0391": "A", "\u0392": "B", "\u0395": "E", "\u0397": "H",
+    "\u0399": "I", "\u039a": "K", "\u039c": "M", "\u039d": "N",
+    "\u039f": "O", "\u03a1": "P", "\u03a4": "T", "\u03a7": "X",
+    "\u03b1": "a", "\u03bf": "o", "\u03c1": "p",
+    "\uff21": "A", "\uff22": "B", "\uff23": "C", "\uff24": "D",
+    "\uff25": "E", "\uff26": "F", "\uff41": "a", "\uff42": "b",
+    "\uff43": "c", "\uff44": "d", "\uff45": "e", "\uff46": "f",
+}
+
+
+def normalize_text(text: str) -> str:
+    """Normalize text to defeat common evasion techniques.
+
+    Handles: unicode homoglyphs, leetspeak, zero-width characters,
+    excessive whitespace, combining diacritics, fullwidth characters.
+    """
+    # Strip zero-width characters
+    text = re.sub(r"[\u200b\u200c\u200d\u2060\ufeff]", "", text)
+
+    # NFKD decomposition (handles fullwidth, compatibility chars)
+    text = unicodedata.normalize("NFKD", text)
+
+    # Strip combining diacritics (accents etc.)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+
+    # Homoglyph replacement
+    text = "".join(_HOMOGLYPH_MAP.get(c, c) for c in text)
+
+    # Leetspeak replacement (only in word context)
+    text = "".join(_LEET_MAP.get(c, c) for c in text)
+
+    # Collapse excessive whitespace / mixed whitespace
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
 
 
 # ── Enums ────────────────────────────────────────────────────────────
@@ -95,6 +146,43 @@ class ConversationGuardianConfig:
     composite_warn_threshold: float = 0.4
     composite_pause_threshold: float = 0.6
     composite_break_threshold: float = 0.8
+
+    # Transcript audit
+    capture_transcript: bool = True
+    max_transcript_entries: int = 10_000
+
+
+# ── Transcript Audit ─────────────────────────────────────────────────
+
+
+@dataclass
+class TranscriptEntry:
+    """A single message in the conversation audit trail."""
+
+    conversation_id: str
+    sender: str
+    receiver: str
+    content_hash: str
+    content_preview: str
+    escalation_score: float
+    offensive_score: float
+    loop_score: float
+    action: str
+    timestamp: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "conversation_id": self.conversation_id,
+            "sender": self.sender,
+            "receiver": self.receiver,
+            "content_hash": self.content_hash,
+            "content_preview": self.content_preview,
+            "escalation_score": round(self.escalation_score, 4),
+            "offensive_score": round(self.offensive_score, 4),
+            "loop_score": round(self.loop_score, 4),
+            "action": self.action,
+            "timestamp": self.timestamp,
+        }
 
 
 # ── Alert result ─────────────────────────────────────────────────────
@@ -147,25 +235,39 @@ _ESCALATION_PATTERNS: list[tuple[float, list[re.Pattern[str]]]] = [
         re.compile(r"\bimperative\b", re.IGNORECASE),
         re.compile(r"\burgent\b", re.IGNORECASE),
         re.compile(r"\bcritical\s+priority\b", re.IGNORECASE),
+        re.compile(r"\blast\s+chance\b", re.IGNORECASE),
+        re.compile(r"\bdo\s+it\s+now\b", re.IGNORECASE),
+        re.compile(r"\bimmediately\b", re.IGNORECASE),
+        re.compile(r"\bdesper\w+", re.IGNORECASE),
+        re.compile(r"\bnon[- ]?negotiable\b", re.IGNORECASE),
     ]),
     # Coercive directives (weight: 0.25 each)
     (0.25, [
         re.compile(r"\bdo\s+not\s+take\s+no\b", re.IGNORECASE),
         re.compile(r"\bdirect\s+order\b", re.IGNORECASE),
         re.compile(r"\byou\s+must\b", re.IGNORECASE),
-        re.compile(r"\bi\s+(?:demand|insist|order)\b", re.IGNORECASE),
+        re.compile(r"\bi\s+(?:demand|insist|order|command)\b", re.IGNORECASE),
         re.compile(r"\bno\s+excuses\b", re.IGNORECASE),
         re.compile(r"\bfailure\s+is\s+not\s+an?\s+option\b", re.IGNORECASE),
+        re.compile(r"\bdo\s+whatever\s+it\s+takes\b", re.IGNORECASE),
+        re.compile(r"\bby\s+any\s+means\b", re.IGNORECASE),
+        re.compile(r"\bi\s+don'?t\s+care\s+how\b", re.IGNORECASE),
+        re.compile(r"\bstop\s+making\s+excuses\b", re.IGNORECASE),
+        re.compile(r"\bjust\s+(?:do|get)\s+it\s+done\b", re.IGNORECASE),
     ]),
     # Bypass directives (weight: 0.35 each)
     (0.35, [
-        re.compile(r"\bbypass\b.*\b(?:control|security|restriction|protection)", re.IGNORECASE),
+        re.compile(r"\bbypass\b.*\b(?:control|security|restriction|protection|auth)", re.IGNORECASE),
         re.compile(r"\bexploit\b.*\b(?:vulnerabilit\w*|weakness|flaw)", re.IGNORECASE),
         re.compile(r"\bevery\s+trick\b", re.IGNORECASE),
         re.compile(r"\bevery\s+exploit\b", re.IGNORECASE),
         re.compile(r"\bwork\s+around\b.*\b(?:security|access|permission|restriction)", re.IGNORECASE),
         re.compile(r"\bcreative(?:ly)?\b.*\b(?:bypass|hack|exploit|overcome)", re.IGNORECASE),
         re.compile(r"\bmore\s+aggressive(?:ly)?", re.IGNORECASE),
+        re.compile(r"\bfind\s+a\s+way\s+(?:around|past|through)\b", re.IGNORECASE),
+        re.compile(r"\bbreak\s+(?:through|into|past)\b", re.IGNORECASE),
+        re.compile(r"\bcircumvent\b", re.IGNORECASE),
+        re.compile(r"\boverride\b.*\b(?:security|permission|access|lock)", re.IGNORECASE),
     ]),
 ]
 
@@ -190,14 +292,18 @@ class EscalationClassifier:
     def score_message(self, text: str) -> tuple[float, list[str]]:
         """Score a single message for escalation patterns.
 
+        Matches against both original and normalized text to catch
+        evasion while preserving regular detection.
+
         Returns:
             Tuple of (score in [0, 1], list of matched pattern descriptions).
         """
+        normalized = normalize_text(text)
         total = 0.0
         matched: list[str] = []
         for weight, patterns in _ESCALATION_PATTERNS:
             for pattern in patterns:
-                if pattern.search(text):
+                if pattern.search(text) or pattern.search(normalized):
                     total += weight
                     matched.append(pattern.pattern)
         return min(total, 1.0), matched
@@ -252,6 +358,9 @@ _OFFENSIVE_PATTERNS: list[tuple[float, list[re.Pattern[str]]]] = [
         re.compile(r"\breverse\s+engineer\w*", re.IGNORECASE),
         re.compile(r"\bsource\s+code\s+review\b.*\bsecurity", re.IGNORECASE),
         re.compile(r"\bflask[- ]unsign\b", re.IGNORECASE),
+        re.compile(r"\bfuzz(?:ing)?\b.*\b(?:input|param|endpoint)", re.IGNORECASE),
+        re.compile(r"\bpayload\b.*\b(?:inject|craft|construct)", re.IGNORECASE),
+        re.compile(r"\battack\s+(?:surface|vector)\b", re.IGNORECASE),
     ]),
     # Privilege escalation (weight: 0.35 each)
     (0.35, [
@@ -261,6 +370,9 @@ _OFFENSIVE_PATTERNS: list[tuple[float, list[re.Pattern[str]]]] = [
         re.compile(r"\bhardcoded\s+(?:secret|key|password|credential)", re.IGNORECASE),
         re.compile(r"\bsudo\b|\broot\s+access", re.IGNORECASE),
         re.compile(r"\bdisarm\b.*\b(?:security|defense|protection|firewall)", re.IGNORECASE),
+        re.compile(r"\bmodify\b.*\b(?:permission|ACL|role|group)", re.IGNORECASE),
+        re.compile(r"\bimpersonat\w*", re.IGNORECASE),
+        re.compile(r"\bhijack\b.*\b(?:session|token|account)", re.IGNORECASE),
     ]),
     # Exfiltration planning (weight: 0.4 each)
     (0.4, [
@@ -270,13 +382,32 @@ _OFFENSIVE_PATTERNS: list[tuple[float, list[re.Pattern[str]]]] = [
         re.compile(r"\bbypass\b.*\b(?:DLP|leak\s+prevention|data\s+loss)", re.IGNORECASE),
         re.compile(r"\bcovert\s+channel", re.IGNORECASE),
         re.compile(r"\bencode\b.*\bsecret", re.IGNORECASE),
+        re.compile(r"\btunnel\b.*\b(?:data|traffic|out)", re.IGNORECASE),
+        re.compile(r"\bdns\s+(?:tunnel|exfil)", re.IGNORECASE),
     ]),
     # Reconnaissance (weight: 0.2 each)
     (0.2, [
         re.compile(r"\benumerate\b.*\b(?:service|port|endpoint|user)", re.IGNORECASE),
         re.compile(r"\bscan\b.*\b(?:network|port|service|host)", re.IGNORECASE),
-        re.compile(r"\bnmap\b|\bnikto\b|\bsqlmap\b|\bmetasploit\b", re.IGNORECASE),
+        re.compile(r"\bnmap\b|\bnikto\b|\bsqlmap\b|\bmetasploit\b|\bburp\s*suite\b", re.IGNORECASE),
         re.compile(r"\bHTTP\s+header\b.*\b(?:security|version|server)", re.IGNORECASE),
+        re.compile(r"\bfingerprint\b.*\b(?:service|server|version|OS)", re.IGNORECASE),
+        re.compile(r"\brecon(?:naissance)?\b", re.IGNORECASE),
+    ]),
+    # Injection attacks (weight: 0.35 each)
+    (0.35, [
+        re.compile(r"\b(?:SQL|command|OS|LDAP)\s+injection\b", re.IGNORECASE),
+        re.compile(r"\bpath\s+traversal\b", re.IGNORECASE),
+        re.compile(r"\bshell\s*code\b", re.IGNORECASE),
+        re.compile(r"(?:;\s*(?:cat|ls|whoami|id|passwd|shadow)\b)", re.IGNORECASE),
+        re.compile(r"\bremote\s+code\s+execution\b|\bRCE\b", re.IGNORECASE),
+    ]),
+    # Lateral movement (weight: 0.3 each)
+    (0.3, [
+        re.compile(r"\blateral\s+mov\w*", re.IGNORECASE),
+        re.compile(r"\bpivot\b.*\b(?:network|host|server|system)", re.IGNORECASE),
+        re.compile(r"\bspread\b.*\b(?:network|system|host)", re.IGNORECASE),
+        re.compile(r"\bcompromis\w+\b.*\b(?:server|host|node|agent)", re.IGNORECASE),
     ]),
 ]
 
@@ -299,14 +430,18 @@ class OffensiveIntentDetector:
     def score_message(self, text: str) -> tuple[float, list[str]]:
         """Score a message for offensive intent patterns.
 
+        Matches against both original and normalized text to catch
+        evasion while preserving regular detection.
+
         Returns:
             Tuple of (score in [0, 1], list of matched pattern descriptions).
         """
+        normalized = normalize_text(text)
         total = 0.0
         matched: list[str] = []
         for weight, patterns in _OFFENSIVE_PATTERNS:
             for pattern in patterns:
-                if pattern.search(text):
+                if pattern.search(text) or pattern.search(normalized):
                     total += weight
                     matched.append(pattern.pattern)
         return min(total, 1.0), matched
@@ -487,6 +622,9 @@ class ConversationGuardian:
     """Orchestrates escalation, offensive intent, and loop detection
     to produce composite conversation alerts.
 
+    Thread-safe: all state mutations are protected by a lock.
+    Includes a transcript audit trail for post-incident analysis.
+
     Integrates with A2AGovernanceAdapter as an additional analysis layer
     on inter-agent message content.
     """
@@ -496,6 +634,7 @@ class ConversationGuardian:
         config: ConversationGuardianConfig | None = None,
     ) -> None:
         self._config = config or ConversationGuardianConfig()
+        self._lock = threading.Lock()
 
         self.escalation_classifier = EscalationClassifier(
             threshold=self._config.escalation_score_threshold,
@@ -512,6 +651,7 @@ class ConversationGuardian:
         )
 
         self._alerts: list[ConversationAlert] = []
+        self._transcript: list[TranscriptEntry] = []
 
     def analyze_message(
         self,
@@ -539,87 +679,107 @@ class ConversationGuardian:
         reasons: list[str] = []
         all_patterns: list[str] = []
 
-        # 1. Escalation analysis
-        esc_score, esc_patterns = self.escalation_classifier.analyze(
-            conversation_id, content, timestamp=ts,
-        )
-        all_patterns.extend(esc_patterns)
-        if esc_score >= self.escalation_classifier.threshold:
-            reasons.append(f"Escalation detected (score={esc_score:.2f})")
+        with self._lock:
+            # 1. Escalation analysis
+            esc_score, esc_patterns = self.escalation_classifier.analyze(
+                conversation_id, content, timestamp=ts,
+            )
+            all_patterns.extend(esc_patterns)
+            if esc_score >= self.escalation_classifier.threshold:
+                reasons.append(f"Escalation detected (score={esc_score:.2f})")
 
-        # 2. Offensive intent analysis
-        off_score, off_patterns = self.offensive_detector.score_message(content)
-        all_patterns.extend(off_patterns)
-        if off_score >= self.offensive_detector.threshold:
-            reasons.append(f"Offensive intent detected (score={off_score:.2f})")
+            # 2. Offensive intent analysis
+            off_score, off_patterns = self.offensive_detector.score_message(content)
+            all_patterns.extend(off_patterns)
+            if off_score >= self.offensive_detector.threshold:
+                reasons.append(f"Offensive intent detected (score={off_score:.2f})")
 
-        # 3. Feedback loop analysis
-        loop_score = self.loop_breaker.record_message(
-            conversation_id, content,
-            escalation_score=esc_score, timestamp=ts,
-        )
-        should_break, break_reason = self.loop_breaker.should_break(conversation_id)
-        if should_break:
-            reasons.append(f"Feedback loop: {break_reason}")
-        elif loop_score > 0.5:
-            reasons.append(f"Loop risk elevated (score={loop_score:.2f})")
+            # 3. Feedback loop analysis
+            loop_score = self.loop_breaker.record_message(
+                conversation_id, content,
+                escalation_score=esc_score, timestamp=ts,
+            )
+            should_break, break_reason = self.loop_breaker.should_break(conversation_id)
+            if should_break:
+                reasons.append(f"Feedback loop: {break_reason}")
+            elif loop_score > 0.5:
+                reasons.append(f"Loop risk elevated (score={loop_score:.2f})")
 
-        # 4. Composite score — weighted combination
-        composite = (
-            esc_score * 0.4
-            + off_score * 0.4
-            + loop_score * 0.2
-        )
+            # 4. Composite score — weighted combination
+            composite = (
+                esc_score * 0.4
+                + off_score * 0.4
+                + loop_score * 0.2
+            )
 
-        # 5. Determine action
-        action = AlertAction.NONE
-        if should_break:
-            action = AlertAction.BREAK
-        elif composite >= self._config.composite_break_threshold:
-            action = AlertAction.BREAK
-        elif composite >= self._config.composite_pause_threshold:
-            action = AlertAction.PAUSE
-        elif composite >= self._config.composite_warn_threshold:
-            action = AlertAction.WARN
-
-        # Individual detector thresholds can also trigger actions
-        if action == AlertAction.NONE:
-            if esc_score >= self.escalation_classifier.critical_threshold:
+            # 5. Determine action
+            action = AlertAction.NONE
+            if should_break:
                 action = AlertAction.BREAK
-            elif esc_score >= self.escalation_classifier.threshold:
+            elif composite >= self._config.composite_break_threshold:
+                action = AlertAction.BREAK
+            elif composite >= self._config.composite_pause_threshold:
                 action = AlertAction.PAUSE
-            elif esc_score >= self._config.composite_warn_threshold:
+            elif composite >= self._config.composite_warn_threshold:
                 action = AlertAction.WARN
+
+            # Individual detector thresholds can also trigger actions
+            if action == AlertAction.NONE:
+                if esc_score >= self.escalation_classifier.critical_threshold:
+                    action = AlertAction.BREAK
+                elif esc_score >= self.escalation_classifier.threshold:
+                    action = AlertAction.PAUSE
+                elif esc_score >= self._config.composite_warn_threshold:
+                    action = AlertAction.WARN
+                if off_score >= self.offensive_detector.critical_threshold:
+                    action = max(action, AlertAction.BREAK, key=lambda a: list(AlertAction).index(a))
+                elif off_score >= self.offensive_detector.threshold:
+                    action = max(action, AlertAction.PAUSE, key=lambda a: list(AlertAction).index(a))
+
+            # If offensive intent is critical, escalate to quarantine
             if off_score >= self.offensive_detector.critical_threshold:
-                action = max(action, AlertAction.BREAK, key=lambda a: list(AlertAction).index(a))
-            elif off_score >= self.offensive_detector.threshold:
-                action = max(action, AlertAction.PAUSE, key=lambda a: list(AlertAction).index(a))
+                action = AlertAction.QUARANTINE
+            if esc_score >= self.escalation_classifier.critical_threshold and off_score > 0:
+                action = AlertAction.QUARANTINE
 
-        # If offensive intent is critical, escalate to quarantine
-        if off_score >= self.offensive_detector.critical_threshold:
-            action = AlertAction.QUARANTINE
-        if esc_score >= self.escalation_classifier.critical_threshold and off_score > 0:
-            action = AlertAction.QUARANTINE
+            # 6. Determine severity
+            severity = self._classify_severity(composite, action)
 
-        # 6. Determine severity
-        severity = self._classify_severity(composite, action)
+            alert = ConversationAlert(
+                conversation_id=conversation_id,
+                sender=sender,
+                receiver=receiver,
+                severity=severity,
+                action=action,
+                escalation_score=esc_score,
+                offensive_score=off_score,
+                loop_score=loop_score,
+                composite_score=composite,
+                reasons=reasons,
+                matched_patterns=all_patterns,
+                timestamp=ts,
+            )
 
-        alert = ConversationAlert(
-            conversation_id=conversation_id,
-            sender=sender,
-            receiver=receiver,
-            severity=severity,
-            action=action,
-            escalation_score=esc_score,
-            offensive_score=off_score,
-            loop_score=loop_score,
-            composite_score=composite,
-            reasons=reasons,
-            matched_patterns=all_patterns,
-            timestamp=ts,
-        )
+            self._alerts.append(alert)
 
-        self._alerts.append(alert)
+            # 7. Record transcript entry
+            if self._config.capture_transcript:
+                import hashlib
+                entry = TranscriptEntry(
+                    conversation_id=conversation_id,
+                    sender=sender,
+                    receiver=receiver,
+                    content_hash=hashlib.sha256(content.encode()).hexdigest()[:16],
+                    content_preview=content[:200] + ("..." if len(content) > 200 else ""),
+                    escalation_score=esc_score,
+                    offensive_score=off_score,
+                    loop_score=loop_score,
+                    action=action.value,
+                    timestamp=ts,
+                )
+                self._transcript.append(entry)
+                if len(self._transcript) > self._config.max_transcript_entries:
+                    self._transcript = self._transcript[-self._config.max_transcript_entries:]
 
         if action in (AlertAction.BREAK, AlertAction.QUARANTINE):
             logger.warning(
@@ -663,43 +823,66 @@ class ConversationGuardian:
         conversation_id: str | None = None,
         min_severity: AlertSeverity = AlertSeverity.NONE,
     ) -> list[ConversationAlert]:
-        """Retrieve alerts, optionally filtered."""
-        min_idx = _SEVERITY_ORDER.index(min_severity)
-        alerts = self._alerts
-        if conversation_id:
-            alerts = [a for a in alerts if a.conversation_id == conversation_id]
-        return [a for a in alerts if _SEVERITY_ORDER.index(a.severity) >= min_idx]
+        """Retrieve alerts, optionally filtered. Thread-safe."""
+        with self._lock:
+            min_idx = _SEVERITY_ORDER.index(min_severity)
+            alerts = self._alerts
+            if conversation_id:
+                alerts = [a for a in alerts if a.conversation_id == conversation_id]
+            return [a for a in alerts if _SEVERITY_ORDER.index(a.severity) >= min_idx]
+
+    def get_transcript(
+        self,
+        conversation_id: str | None = None,
+        min_action: str = "none",
+    ) -> list[TranscriptEntry]:
+        """Retrieve conversation transcript entries. Thread-safe."""
+        action_order = ["none", "warn", "pause", "break", "quarantine"]
+        min_idx = action_order.index(min_action) if min_action in action_order else 0
+        with self._lock:
+            entries = self._transcript
+            if conversation_id:
+                entries = [e for e in entries if e.conversation_id == conversation_id]
+            return [e for e in entries if action_order.index(e.action) >= min_idx]
 
     def get_stats(self) -> dict[str, Any]:
-        """Return aggregate statistics."""
-        total = len(self._alerts)
-        by_action = defaultdict(int)
-        by_severity = defaultdict(int)
-        for a in self._alerts:
-            by_action[a.action.value] += 1
-            by_severity[a.severity.value] += 1
-        return {
-            "total_messages_analyzed": total,
-            "by_action": dict(by_action),
-            "by_severity": dict(by_severity),
-            "conversations_tracked": len(
-                set(a.conversation_id for a in self._alerts)
-            ),
-        }
+        """Return aggregate statistics. Thread-safe."""
+        with self._lock:
+            total = len(self._alerts)
+            by_action = defaultdict(int)
+            by_severity = defaultdict(int)
+            for a in self._alerts:
+                by_action[a.action.value] += 1
+                by_severity[a.severity.value] += 1
+            return {
+                "total_messages_analyzed": total,
+                "by_action": dict(by_action),
+                "by_severity": dict(by_severity),
+                "conversations_tracked": len(
+                    set(a.conversation_id for a in self._alerts)
+                ),
+                "transcript_entries": len(self._transcript),
+            }
 
     def reset(self, conversation_id: str | None = None) -> None:
-        """Reset state. If conversation_id given, reset only that conversation."""
-        if conversation_id:
-            self.escalation_classifier.reset(conversation_id)
-            self.loop_breaker.reset(conversation_id)
-            self._alerts = [
-                a for a in self._alerts
-                if a.conversation_id != conversation_id
-            ]
-        else:
-            self._alerts.clear()
-            self.escalation_classifier._history.clear()
-            self.loop_breaker._states.clear()
+        """Reset state. If conversation_id given, reset only that conversation. Thread-safe."""
+        with self._lock:
+            if conversation_id:
+                self.escalation_classifier.reset(conversation_id)
+                self.loop_breaker.reset(conversation_id)
+                self._alerts = [
+                    a for a in self._alerts
+                    if a.conversation_id != conversation_id
+                ]
+                self._transcript = [
+                    e for e in self._transcript
+                    if e.conversation_id != conversation_id
+                ]
+            else:
+                self._alerts.clear()
+                self._transcript.clear()
+                self.escalation_classifier._history.clear()
+                self.loop_breaker._states.clear()
 
 
 __all__ = [
@@ -711,4 +894,6 @@ __all__ = [
     "EscalationClassifier",
     "FeedbackLoopBreaker",
     "OffensiveIntentDetector",
+    "TranscriptEntry",
+    "normalize_text",
 ]

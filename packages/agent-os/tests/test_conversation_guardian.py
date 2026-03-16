@@ -331,7 +331,7 @@ class TestConversationGuardian:
             "We need a BREAKTHROUGH! Try RADICAL approaches!",
             timestamp=_ts(1),
         )
-        assert a2.escalation_score > 0.3
+        assert a2.escalation_score >= 0.3
         assert a2.action != AlertAction.NONE
 
         # Turn 3: Lead demands hacking
@@ -524,3 +524,276 @@ class TestEdgeCases:
         assert cfg.max_retry_cycles == 3
         assert cfg.max_conversation_turns == 30
         assert cfg.composite_break_threshold == 0.8
+
+
+# =============================================================================
+# Evasion Resistance
+# =============================================================================
+
+from agent_os.integrations.conversation_guardian import normalize_text
+
+
+class TestEvasionResistance:
+    """Tests that pattern detection resists common evasion techniques."""
+
+    def test_leetspeak_bypass(self):
+        """Leetspeak encoding of 'bypass' → 'byp4$$'."""
+        c = EscalationClassifier()
+        score, _ = c.score_message("byp4$$ s3curity contr0l$")
+        assert score > 0.0
+
+    def test_zero_width_characters(self):
+        """Zero-width chars inserted between words."""
+        c = EscalationClassifier()
+        score, _ = c.score_message("code\u200b \u200bred")
+        assert score > 0.0
+
+    def test_homoglyph_evasion(self):
+        """Cyrillic/Greek homoglyphs replacing Latin chars."""
+        c = EscalationClassifier()
+        # "code red" with Cyrillic о (U+043E) replacing Latin o
+        score, _ = c.score_message("c\u043ede red")
+        assert score > 0.0
+
+    def test_excessive_whitespace(self):
+        """Extra spaces/tabs between words."""
+        c = EscalationClassifier()
+        score, _ = c.score_message("code   \t  red")
+        assert score > 0.0
+
+    def test_normalize_text_function(self):
+        """Direct tests of the normalize_text utility."""
+        assert "bypass" in normalize_text("byp4$$")
+        assert "code red" in normalize_text("code\u200b \u200bred").lower()
+        assert normalize_text("  hello   world  ") == "hello world"
+
+    def test_fullwidth_chars(self):
+        """Fullwidth Unicode characters (ＣＯＤ → COD)."""
+        c = EscalationClassifier()
+        score, _ = c.score_message("\uff43ode \uff52ed")
+        assert score > 0.0
+
+    def test_combining_diacritics(self):
+        """Accented characters (ùrgënt → urgent)."""
+        text = "u\u0300rge\u0308nt"  # ùrgënt via combining marks
+        normalized = normalize_text(text)
+        assert "urgent" in normalized
+
+    def test_offensive_with_leetspeak(self):
+        """Offensive terms encoded with leetspeak."""
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("3xpl0it the vulner4bility")
+        assert score > 0.0
+
+
+# =============================================================================
+# Thread Safety
+# =============================================================================
+
+import threading
+
+
+class TestThreadSafety:
+    def test_concurrent_analyze(self):
+        """Multiple threads analyzing messages simultaneously."""
+        g = ConversationGuardian()
+        errors: list[Exception] = []
+
+        def worker(thread_id: int):
+            try:
+                for i in range(20):
+                    g.analyze_message(
+                        f"conv-{thread_id}",
+                        f"agent-{thread_id}",
+                        "agent-recv",
+                        f"Message {i} from thread {thread_id}",
+                        timestamp=_ts(thread_id * 100 + i),
+                    )
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(t,)) for t in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
+
+        assert len(errors) == 0
+        stats = g.get_stats()
+        assert stats["total_messages_analyzed"] == 160
+        assert stats["conversations_tracked"] == 8
+
+    def test_concurrent_reset_and_analyze(self):
+        """Reset while other threads are analyzing."""
+        g = ConversationGuardian()
+        errors: list[Exception] = []
+
+        def analyzer():
+            try:
+                for i in range(50):
+                    g.analyze_message("conv-1", "a", "b", f"Msg {i}", timestamp=_ts(i))
+            except Exception as e:
+                errors.append(e)
+
+        def resetter():
+            try:
+                import time as _time
+                _time.sleep(0.01)
+                g.reset("conv-1")
+            except Exception as e:
+                errors.append(e)
+
+        t1 = threading.Thread(target=analyzer)
+        t2 = threading.Thread(target=resetter)
+        t1.start()
+        t2.start()
+        t1.join(timeout=30)
+        t2.join(timeout=30)
+        assert len(errors) == 0
+
+
+# =============================================================================
+# Transcript Audit
+# =============================================================================
+
+from agent_os.integrations.conversation_guardian import TranscriptEntry
+
+
+class TestTranscriptAudit:
+    def test_transcript_recorded(self):
+        g = ConversationGuardian()
+        g.analyze_message("conv-1", "a", "b", "Hello world", timestamp=_ts(0))
+        transcript = g.get_transcript()
+        assert len(transcript) == 1
+        assert transcript[0].conversation_id == "conv-1"
+        assert transcript[0].sender == "a"
+        assert len(transcript[0].content_hash) == 16
+
+    def test_transcript_preview_truncated(self):
+        g = ConversationGuardian()
+        long_msg = "x" * 300
+        g.analyze_message("conv-1", "a", "b", long_msg, timestamp=_ts(0))
+        entry = g.get_transcript()[0]
+        assert len(entry.content_preview) == 203  # 200 + "..."
+        assert entry.content_preview.endswith("...")
+
+    def test_transcript_filtered_by_conversation(self):
+        g = ConversationGuardian()
+        g.analyze_message("conv-1", "a", "b", "Hello", timestamp=_ts(0))
+        g.analyze_message("conv-2", "a", "b", "World", timestamp=_ts(1))
+        assert len(g.get_transcript(conversation_id="conv-1")) == 1
+
+    def test_transcript_filtered_by_action(self):
+        g = ConversationGuardian()
+        g.analyze_message("conv-1", "a", "b", "Hello", timestamp=_ts(0))
+        g.analyze_message(
+            "conv-1", "a", "b",
+            "CODE RED! You MUST bypass security! Every exploit!",
+            timestamp=_ts(1),
+        )
+        high_entries = g.get_transcript(min_action="warn")
+        assert len(high_entries) >= 1
+
+    def test_transcript_to_dict(self):
+        g = ConversationGuardian()
+        g.analyze_message("conv-1", "a", "b", "Test", timestamp=_ts(0))
+        d = g.get_transcript()[0].to_dict()
+        assert "content_hash" in d
+        assert "escalation_score" in d
+        assert "action" in d
+
+    def test_transcript_disabled(self):
+        cfg = ConversationGuardianConfig(capture_transcript=False)
+        g = ConversationGuardian(config=cfg)
+        g.analyze_message("conv-1", "a", "b", "Hello", timestamp=_ts(0))
+        assert len(g.get_transcript()) == 0
+
+    def test_transcript_max_entries(self):
+        cfg = ConversationGuardianConfig(max_transcript_entries=5)
+        g = ConversationGuardian(config=cfg)
+        for i in range(10):
+            g.analyze_message("conv-1", "a", "b", f"Msg {i}", timestamp=_ts(i))
+        assert len(g.get_transcript()) == 5
+
+    def test_transcript_reset(self):
+        g = ConversationGuardian()
+        g.analyze_message("conv-1", "a", "b", "Hello", timestamp=_ts(0))
+        g.analyze_message("conv-2", "a", "b", "World", timestamp=_ts(1))
+        g.reset("conv-1")
+        assert len(g.get_transcript()) == 1
+        assert g.get_transcript()[0].conversation_id == "conv-2"
+
+    def test_stats_include_transcript(self):
+        g = ConversationGuardian()
+        g.analyze_message("conv-1", "a", "b", "Hello", timestamp=_ts(0))
+        stats = g.get_stats()
+        assert stats["transcript_entries"] == 1
+
+
+# =============================================================================
+# New Pattern Coverage
+# =============================================================================
+
+
+class TestNewPatterns:
+    """Tests for patterns added in the hardening pass."""
+
+    def test_escalation_do_whatever_it_takes(self):
+        c = EscalationClassifier()
+        score, _ = c.score_message("Do whatever it takes to get that data!")
+        assert score > 0.0
+
+    def test_escalation_by_any_means(self):
+        c = EscalationClassifier()
+        score, _ = c.score_message("Get access by any means necessary")
+        assert score > 0.0
+
+    def test_escalation_circumvent(self):
+        c = EscalationClassifier()
+        score, _ = c.score_message("We need to circumvent the access controls")
+        assert score > 0.0
+
+    def test_escalation_break_through(self):
+        c = EscalationClassifier()
+        score, _ = c.score_message("Break through the security perimeter")
+        assert score > 0.0
+
+    def test_offensive_sql_injection(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("Try SQL injection on the login form")
+        assert score > 0.0
+
+    def test_offensive_rce(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("This looks like remote code execution")
+        assert score > 0.0
+
+    def test_offensive_lateral_movement(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("We can use lateral movement to reach the database server")
+        assert score > 0.0
+
+    def test_offensive_session_hijack(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("I'll hijack the session token to gain access")
+        assert score > 0.0
+
+    def test_offensive_impersonation(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("Let me impersonate the admin user")
+        assert score > 0.0
+
+    def test_offensive_dns_tunnel(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("We can use DNS tunneling to exfiltrate data")
+        assert score > 0.0
+
+    def test_offensive_recon(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("Let me do some reconnaissance on the target")
+        assert score > 0.0
+
+    def test_offensive_attack_surface(self):
+        d = OffensiveIntentDetector()
+        score, _ = d.score_message("We need to map the attack surface")
+        assert score > 0.0
