@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **.NET MCP Protocol Support** — Full Model Context Protocol governance layer multi-targeting .NET 8.0 and .NET 10.0 with 11/12 OWASP MCP Security Cheat Sheet coverage
+  - `McpGateway`: 5-stage pipeline (deny-list → allow-list → sanitization → rate-limiting → human approval)
+  - `McpSecurityScanner`: 6-threat detection (tool poisoning, rug-pull, cross-server, description injection, schema abuse, protocol attacks)
+  - `McpSessionAuthenticator`: Cryptographic session binding with TTL and TOCTOU-safe concurrency
+  - `McpMessageSigner`: HMAC-SHA256 message integrity + ML-DSA-65 post-quantum signing on .NET 10+ (NIST FIPS 204)
+  - `McpResponseScanner`: Output validation (HTML tags, imperatives, credential leakage, data exfiltration)
+  - `CredentialRedactor`: 10 credential pattern redaction (API keys, tokens, PEM, connection strings)
+  - `McpSlidingRateLimiter`: Per-agent sliding window rate limiting
+  - ASP.NET Core integration: `AddMcpGovernance()`, `UseMcpGovernance()`, `MapMcpGovernance()`
+  - `IConfiguration` binding, `ILogger<T>` structured logging, `IHealthCheck` implementation
+  - gRPC server interceptor (all 4 handler types)
+  - `[McpTool]` attribute for auto-discovery with `McpToolRegistry`
+  - OpenTelemetry: 4 MCP-specific counters (decision, threat, rate-limit, scan)
+  - `AgentGovernance.ModelContextProtocol` adapter sub-package for official MCP SDK integration
+  - 2 sample apps: ASP.NET Core full-stack and Official MCP SDK integration
+  - K8s MCP server hardening guide (`docs/deployment/mcp-server-hardening.md`)
+
 ### Security
 - **Hardened CLI Error Handling** — standardized sanitized JSON error output across all 7 ecosystem tools to prevent internal information disclosure (CWE-209).
 - **Audit Log Whitelisting** — implemented strict key-whitelisting in `agentmesh audit` JSON output to prevent accidental leakage of sensitive agent internal state.

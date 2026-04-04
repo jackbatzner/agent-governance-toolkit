@@ -52,6 +52,18 @@ public sealed class GovernanceMetrics : IDisposable
     /// <summary>Audit events emitted.</summary>
     public Counter<long> AuditEvents { get; }
 
+    /// <summary>MCP security threats detected by scanner.</summary>
+    public Counter<long> McpThreatsDetected { get; }
+
+    /// <summary>MCP tool responses scanned.</summary>
+    public Counter<long> McpResponsesScanned { get; }
+
+    /// <summary>MCP sessions created.</summary>
+    public Counter<long> McpSessionsCreated { get; }
+
+    /// <summary>MCP messages verified (signed message checks).</summary>
+    public Counter<long> McpMessagesVerified { get; }
+
     /// <summary>
     /// Initializes a new <see cref="GovernanceMetrics"/> instance with the default meter.
     /// </summary>
@@ -83,6 +95,22 @@ public sealed class GovernanceMetrics : IDisposable
         AuditEvents = _meter.CreateCounter<long>(
             "agent_governance.audit_events",
             description: "Total audit events emitted");
+
+        McpThreatsDetected = _meter.CreateCounter<long>(
+            "agent_governance.mcp.threats_detected",
+            description: "MCP security threats detected by scanner");
+
+        McpResponsesScanned = _meter.CreateCounter<long>(
+            "agent_governance.mcp.responses_scanned",
+            description: "MCP tool responses scanned");
+
+        McpSessionsCreated = _meter.CreateCounter<long>(
+            "agent_governance.mcp.sessions_created",
+            description: "MCP sessions created");
+
+        McpMessagesVerified = _meter.CreateCounter<long>(
+            "agent_governance.mcp.messages_verified",
+            description: "MCP messages verified (signed message checks)");
     }
 
     /// <summary>
@@ -140,6 +168,34 @@ public sealed class GovernanceMetrics : IDisposable
             RateLimitHits.Add(1, tags);
 
         EvaluationLatency.Record(evaluationMs, tags);
+    }
+
+    /// <summary>
+    /// Records an MCP pipeline decision with stage information.
+    /// Delegates to <see cref="RecordDecision"/> and adds a <c>stage</c> tag.
+    /// </summary>
+    /// <param name="allowed">Whether the decision was allow or deny.</param>
+    /// <param name="agentId">The agent DID.</param>
+    /// <param name="toolName">The tool name.</param>
+    /// <param name="evaluationMs">Evaluation time in milliseconds.</param>
+    /// <param name="stage">The pipeline stage that produced the decision
+    /// (e.g. "deny_list", "allow_list", "sanitization", "rate_limit", "approval", "allowed").</param>
+    /// <param name="rateLimited">Whether the request was rate-limited.</param>
+    public void RecordMcpDecision(bool allowed, string agentId, string toolName, double evaluationMs, string stage, bool rateLimited = false)
+    {
+        // Record through the existing decision helper first
+        RecordDecision(allowed, agentId, toolName, evaluationMs, rateLimited);
+
+        // Add an additional measurement with the stage tag for MCP-specific drill-down
+        var tags = new KeyValuePair<string, object?>[]
+        {
+            new("agent_id", agentId),
+            new("tool_name", toolName),
+            new("decision", allowed ? "allow" : "deny"),
+            new("stage", stage)
+        };
+
+        PolicyDecisions.Add(1, tags);
     }
 
     /// <inheritdoc />
