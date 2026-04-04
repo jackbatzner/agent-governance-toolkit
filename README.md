@@ -111,6 +111,8 @@ Still have questions? File a [GitHub issue](https://github.com/microsoft/agent-g
   - [Agent SRE](packages/agent-sre/) | [Observability integrations](packages/agent-hypervisor/src/hypervisor/observability/)
 - **MCP Security Scanner**: Detect tool poisoning, typosquatting, hidden instructions, and rug-pull attacks in MCP tool definitions
   - [MCP Scanner](packages/agent-os/src/agentos/mcp_security.py) | [CLI](packages/agent-os/src/agentos/cli/mcp_scan.py)
+- **.NET MCP Protocol Support**: Full governance pipeline for .NET 8.0 — 5-stage gateway, 6-threat scanner, session auth, message signing, credential redaction (11/12 OWASP MCP sections)
+  - [.NET MCP SDK](packages/agent-governance-dotnet/) | [Official MCP SDK Adapter](packages/agent-governance-dotnet/src/AgentGovernance.ModelContextProtocol/)
 - **Trust Report CLI**: `agentmesh trust report` — visualize trust scores, task success/failure, and agent activity
   - [Trust CLI](packages/agent-mesh/src/agentmesh/cli/trust_cli.py)
 - **Secret Scanning & Fuzzing**: Gitleaks workflow, 7 fuzz targets covering policy, injection, sandbox, trust, and MCP
