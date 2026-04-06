@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT License.
 
+using System.Collections.Concurrent;
 using AgentGovernance.Mcp;
 using Xunit;
 
@@ -289,5 +290,38 @@ public class McpMessageHandlerTests
         var (handler, _) = CreateHandler();
         Assert.ThrowsAny<ArgumentException>(() =>
             handler.RegisterResource("", new Dictionary<string, object>()));
+    }
+
+    [Fact]
+    public void HandleMessage_ConcurrentRegistration_DoesNotThrow()
+    {
+        var (handler, _) = CreateHandler();
+        var errors = new ConcurrentBag<Exception>();
+
+        Parallel.For(0, 200, i =>
+        {
+            try
+            {
+                handler.RegisterTool("file_read", new Dictionary<string, object>
+                {
+                    ["name"] = "file_read",
+                    ["description"] = $"Read a file {i}"
+                });
+                handler.RegisterResource("file://readme.txt", new Dictionary<string, object>
+                {
+                    ["uri"] = "file://readme.txt",
+                    ["name"] = $"readme-{i}"
+                });
+
+                _ = handler.HandleMessage(MakeMessage("tools/list"));
+                _ = handler.HandleMessage(MakeMessage("resources/list"));
+            }
+            catch (Exception ex)
+            {
+                errors.Add(ex);
+            }
+        });
+
+        Assert.Empty(errors);
     }
 }

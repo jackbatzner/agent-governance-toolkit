@@ -63,7 +63,7 @@ public sealed class McpResponseScanner
             RegexOptions.Compiled, RegexTimeout),
         new(@"AKIA[A-Z0-9]{16}",
             RegexOptions.Compiled, RegexTimeout),
-        new(@"-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----",
+        new(@"-----BEGIN(?:\s+[A-Z0-9]+)*\s+PRIVATE\s+KEY-----",
             RegexOptions.Compiled, RegexTimeout),
         new(@"Bearer\s+[A-Za-z0-9._\-]{20,}",
             RegexOptions.Compiled, RegexTimeout),
