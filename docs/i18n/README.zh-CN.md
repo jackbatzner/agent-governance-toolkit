@@ -1,4 +1,4 @@
-🌍 [English](/README.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
+🌍 [English](../../README.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
 
 ![Agent Governance Toolkit](../../docs/assets/readme-banner.svg)
 
@@ -71,6 +71,8 @@ pip install agentmesh-lightning        # 强化学习训练治理
 - **[.NET SDK](../../packages/agent-governance-dotnet/README.md)** — 提供完整 OWASP 覆盖的 NuGet 包
 - **[Rust SDK](../../packages/agent-mesh/sdks/rust/agentmesh/README.md)** — crates.io 上的库，包含策略、信任、审计及 Ed25519 身份
 - **[Go SDK](../../packages/agent-mesh/sdks/go/README.md)** — 提供策略、信任、审计与身份功能的 Go 模块
+- **[Go MCP 安全文档](../../packages/agent-mesh/sdks/go/docs/owasp-mcp-mapping.md)** — Go SDK 中的 MCP gateway、签名、限流、工具扫描与密钥泄露防护
+- **[Go MCP 独立模块](../../packages/agent-mesh/packages/mcp-governance-go/README.md)** — 仅引入 MCP 安全原语的独立 Go 模块
 - **[教程](../../docs/tutorials/)** — 涵盖策略、身份、集成、合规、SRE 与沙箱的分步指南
 - **[Azure 部署](../../docs/deployment/README.md)** — 支持 AKS, Azure AI Foundry, Container Apps, OpenClaw 边车
 - **[NVIDIA OpenShell 集成](../../docs/integrations/openshell.md)** — 将沙箱隔离与治理智能相结合
@@ -93,7 +95,7 @@ pip install agentmesh-lightning        # 强化学习训练治理
 - **代理 SRE**: 包含 SLO、错误预算、回放调试、混沌工程、熔断机制与渐进式发布
   - [Agent SRE](../../packages/agent-sre/) | [可观测性集成](../../packages/agent-hypervisor/src/hypervisor/observability/)
 - **MCP 安全扫描器**: 检测 MCP 工具定义中的工具投毒、拼写劫持(typosquatting)、隐藏指令与rug-pull攻击
-  - [MCP 扫描器](../../packages/agent-os/src/agentos/mcp_security.py) | [CLI](../../packages/agent-os/src/agentos/cli/mcp_scan.py)
+  - [MCP 扫描器](../../packages/agent-os/src/agent_os/mcp_security.py) | [CLI](../../packages/agent-os/src/agent_os/cli/mcp_scan.py)
 - **信任报告 CLI**: `agentmesh trust report` — 可视化信任评分、任务成功/失败情况及代理活动
   - [信任 CLI](../../packages/agent-mesh/src/agentmesh/cli/trust_cli.py)
 - **密钥扫描与模糊测试**: 基于 Gitleaks 的工作流，包含 7 个模糊测试目标，覆盖策略、注入、沙箱、信任及 MCP

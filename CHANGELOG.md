@@ -15,14 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hardened CLI Error Handling** — standardized sanitized JSON error output across all 7 ecosystem tools to prevent internal information disclosure (CWE-209).
 - **Audit Log Whitelisting** — implemented strict key-whitelisting in `agentmesh audit` JSON output to prevent accidental leakage of sensitive agent internal state.
 - **CLI Input Validation** — added regex-based validation for agent identifiers (DIDs/names) in registration and verification commands to prevent injection attacks.
+- **Go MCP Security Primitives** — added fail-closed MCP signing, session authentication, rate limiting, tool metadata scanning, response scanning, credential redaction, and gateway enforcement for the Go SDK with server-side OWASP MCP cheat sheet coverage.
 
 ### Added
 - **EU AI Act Risk Classifier** (`agentmesh.governance.EUAIActRiskClassifier`) — structured risk classification per Article 6 and Annex III, with Art. 6(1) Annex I safety-component path, Art. 6(3) exemptions, GDPR Art. 4(4) profiling override, and configurable YAML categories for regulatory updates (#756).
+- **Standalone Go MCP Governance Module** (`packages/agent-mesh/packages/mcp-governance-go`) — re-exportable Go module for MCP-only integrations on top of the AgentMesh Go SDK.
 
 ### Documentation
 - Added `EUAIActRiskClassifier` usage example and API docs to `packages/agent-mesh/README.md`.
 - Updated `QUICKSTART.md` and `Tutorial 04 — Audit & Compliance` with secure JSON error handling examples and schema details.
 - Added "Secure Error Handling" sections to primary documentation to guide users on interpreting sanitized machine-readable outputs.
+- Added Go MCP API reference, OWASP mapping, tool integration guide, SDK README coverage, and Chinese README links for the new Go MCP security surface.
 
 
 ## [3.0.2] - 2026-04-02
