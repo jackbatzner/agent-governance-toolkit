@@ -2,7 +2,9 @@
   "version": "0.2",
   "language": "en",
   "useGitignore": true,
-  "dictionaries": ["repo-terms"],
+  "dictionaries": [
+    "repo-terms"
+  ],
   "dictionaryDefinitions": [
     {
       "name": "repo-terms",
@@ -34,7 +36,15 @@
     "backdoors",
     "metacharacters",
     "metacharacter",
-    "Blocklist"
+    "Blocklist",
+    "TOCTOU",
+    "sandboxing",
+    "Sandboxed",
+    "backpressure",
+    "Backpressure",
+    "blocklists",
+    "previoushash",
+    "entryhash"
   ],
   "ignorePaths": [
     "**/node_modules/**",
