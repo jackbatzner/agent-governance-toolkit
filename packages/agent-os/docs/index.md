@@ -22,7 +22,7 @@ Learn by doing with our Jupyter notebooks:
 | [Hello Agent OS](../notebooks/01-hello-agent-os.ipynb) | 5 min | Your first governed agent |
 | [Episodic Memory](../notebooks/02-episodic-memory-demo.ipynb) | 15 min | Persistent agent memory |
 | [Time-Travel Debugging](../notebooks/03-time-travel-debugging.ipynb) | 20 min | Replay agent decisions |
-| [Verification](../notebooks/04-verification.ipynb) | 15 min | Detect hallucinations |
+| [Verification](../notebooks/04-cross-model-verification.ipynb) | 15 min | Detect hallucinations |
 | [Multi-Agent Coordination](../notebooks/05-multi-agent-coordination.ipynb) | 20 min | Agent trust protocols |
 | [Policy Engine](../notebooks/06-policy-engine.ipynb) | 15 min | Deep dive into policies |
 
@@ -38,15 +38,17 @@ Learn by doing with our Jupyter notebooks:
 ### 🔧 Reference
 
 - [Framework Integrations](integrations.md) - LangChain, OpenAI, CrewAI
+- [MCP Tools & Security Guide](mcp-tools.md) - MCP server surface plus Python adoption guidance for MCP hardening
 - [AgentConfig File Reference](agent-config-reference.md) - Supported YAML keys and validation rules
+- [OWASP Agentic Top 10 Mapping](owasp-agentic-top10-mapping.md) - Risk-by-risk security coverage and mitigation examples
 - [Dependencies](dependencies.md) - Package dependencies
 - [Security Specification](security-spec.md) - Security model
 - [FAQ](faq.md) - Common questions and answers
 
 ### 📋 RFCs
 
-- [RFC-003: Agent Signals](rfcs/RFC-003-Agent-Signals.md) - POSIX-style signals
-- [RFC-004: Agent Primitives](rfcs/RFC-004-Agent-Primitives.md) - Core primitives
+- [Signal Handling](signal-handling.md) - POSIX-style signals
+- [API Reference](api-reference.md) - Core primitives and contracts
 
 ### 🎯 Case Studies
 
@@ -135,9 +137,9 @@ policies:
 | IDE | Status | Link |
 |-----|--------|------|
 | VS Code | ✅ Available | [Marketplace](../../agent-os-vscode/) |
-| JetBrains | ✅ Available | [Plugin](extensions/jetbrains/) |
-| Cursor | ✅ Available | [Extension](extensions/cursor/) |
-| GitHub Copilot | ✅ Available | [Extension](extensions/copilot/) |
+| JetBrains | ✅ Available | [Plugin](../extensions/jetbrains/) |
+| Cursor | ✅ Available | [Extension](../extensions/cursor/) |
+| GitHub Copilot | ✅ Available | [Extension](../extensions/copilot/) |
 
 ## Policy Templates
 
@@ -158,7 +160,7 @@ agentos init my-project --template secure-coding
 
 - [GitHub Issues](https://github.com/microsoft/agent-governance-toolkit/issues)
 - [Discussions](https://github.com/microsoft/agent-governance-toolkit/discussions)
-- [Contributing Guide](../CONTRIBUTING.md)
+- [Contributing Guide](../../../CONTRIBUTING.md)
 
 ---
 

@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-
 ## [3.1.0] - 2026-04-11
 
 ### Added
@@ -30,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hardened CLI Error Handling** — standardized sanitized JSON error output across all 7 ecosystem tools to prevent internal information disclosure (CWE-209)
 - **Audit Log Whitelisting** — implemented strict key-whitelisting in `agentmesh audit` JSON output to prevent accidental leakage of sensitive agent internal state
 - **CLI Input Validation** — added regex-based validation for agent identifiers (DIDs/names) in registration and verification commands to prevent injection attacks
+- **Python MCP OWASP parity** — added `MCPResponseScanner`, `MCPSessionAuthenticator`, `MCPMessageSigner`, `CredentialRedactor`, and `MCPSlidingRateLimiter` to harden Python MCP integrations with response scanning, session binding, message integrity, credential redaction, and per-agent sliding-window enforcement
+- **MCP observability counters** — added `mcp_decisions`, `mcp_threats_detected`, `mcp_rate_limit_hits`, and `mcp_scans` to the Python MCP gateway and security scanner paths
 
 ### Fixed
 - Repo hygiene: MIT headers, compliance disclaimers, dependency confusion, network bindings (#926)
@@ -45,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `EUAIActRiskClassifier` usage example and API docs to `packages/agent-mesh/README.md`
 - Updated `QUICKSTART.md` and `Tutorial 04 — Audit & Compliance` with secure JSON error handling examples and schema details
 - Added "Secure Error Handling" sections to primary documentation to guide users on interpreting sanitized machine-readable outputs
+- Documented the Python MCP security stack, adoption guidance, and OWASP mapping updates across `packages/agent-os/README.md` and the Agent OS docs set.
 
 
 ## [3.0.2] - 2026-04-02

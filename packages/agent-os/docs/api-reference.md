@@ -18,6 +18,7 @@ Comprehensive reference for all public modules, classes, and functions in Agent 
 - [Health Checks](#health-checks)
 - [Circuit Breaker](#circuit-breaker)
 - [Metrics](#metrics)
+- [MCP Security & Governance](#mcp-security--governance)
 - [Trust Root & Supervisor Hierarchy](#trust-root--supervisor-hierarchy)
 - [Execution Sandbox](#execution-sandbox)
 - [Exception Hierarchy](#exception-hierarchy)
@@ -677,6 +678,101 @@ snap = metrics.snapshot()
 | `record_blocked` | `(adapter: str)` | `None` | Record a blocked tool call |
 | `snapshot` | `()` | `dict` | JSON-serializable metrics snapshot |
 | `reset` | `()` | `None` | Reset all counters (useful for tests) |
+
+---
+
+## MCP Security & Governance
+
+**Modules:** `agent_os.mcp_gateway`, `agent_os.mcp_security`, `agent_os.mcp_response_scanner`, `agent_os.mcp_session_auth`, `agent_os.mcp_message_signer`, `agent_os.credential_redactor`, `agent_os.mcp_sliding_rate_limiter`
+
+Standalone MCP hardening primitives for Python servers, clients, and tool wrappers. These components cover metadata scanning, request governance, output scanning, session auth, message integrity, credential redaction, and MCP-specific rate limiting.
+
+### `MCPGateway`
+
+```python
+from agent_os import MCPGateway
+from agent_os.integrations.base import GovernancePolicy
+
+policy = GovernancePolicy(name="mcp", allowed_tools=["search_docs"], max_tool_calls=10)
+gateway = MCPGateway(policy, sensitive_tools=["write_repo"])
+allowed, reason = gateway.intercept_tool_call("agent-001", "search_docs", {"query": "OWASP"})
+```
+
+| Method / Property | Signature | Returns | Description |
+|-------------------|-----------|---------|-------------|
+| `__init__` | `(policy, denied_tools=None, sensitive_tools=None, approval_callback=None, enable_builtin_sanitization=True, metrics=None)` | — | Create a gateway for MCP tool calls |
+| `intercept_tool_call` | `(agent_id: str, tool_name: str, params: dict[str, Any])` | `tuple[bool, str]` | Evaluate a tool call through allow/deny, sanitization, budget, and approval checks |
+| `wrap_mcp_server` | `static (server_config: dict[str, Any], policy, denied_tools=None, sensitive_tools=None)` | `GatewayConfig` | Return a governed MCP server configuration wrapper |
+| `audit_log` | property | `list[AuditEntry]` | Copy of recorded tool-call audit entries |
+| `get_agent_call_count` | `(agent_id: str)` | `int` | Current per-agent budget usage |
+| `reset_agent_budget` | `(agent_id: str)` | `None` | Reset one agent's budget |
+| `reset_all_budgets` | `()` | `None` | Reset all tracked budgets |
+
+### `MCPSecurityScanner`
+
+| Method | Signature | Returns | Description |
+|--------|-----------|---------|-------------|
+| `scan_tool` | `(tool_name: str, description: str, schema: dict[str, Any] \| None = None, server_name: str = "unknown")` | `list[MCPThreat]` | Scan one MCP tool definition for poisoning, schema abuse, rug pulls, and cross-server issues |
+| `scan_server` | `(server_name: str, tools: list[dict[str, Any]])` | `ScanResult` | Batch-scan all tools exposed by a server |
+| `register_tool` | `(tool_name: str, description: str, schema: dict[str, Any] \| None, server_name: str)` | `ToolFingerprint` | Fingerprint a tool definition for later rug-pull checks |
+| `check_rug_pull` | `(tool_name: str, description: str, schema: dict[str, Any] \| None, server_name: str)` | `MCPThreat \| None` | Compare the current definition against a previously registered fingerprint |
+
+### `MCPResponseScanner`
+
+| Method | Signature | Returns | Description |
+|--------|-----------|---------|-------------|
+| `scan_response` | `(response_content: str \| None, tool_name: str = "unknown")` | `MCPResponseScanResult` | Detect instruction tags, imperative output injections, credential leaks, and suspicious exfiltration URLs |
+| `sanitize_response` | `(response_content: str \| None, tool_name: str = "unknown")` | `tuple[str, list[MCPResponseThreat]]` | Strip instruction tags and report what was removed |
+
+### `MCPSessionAuthenticator`
+
+| Method / Property | Signature | Returns | Description |
+|-------------------|-----------|---------|-------------|
+| `__init__` | `(session_ttl=timedelta(hours=1), max_concurrent_sessions=10)` | — | Configure token TTL and per-agent concurrent session cap |
+| `create_session` | `(agent_id: str, user_id: str \| None = None)` | `str` | Create a cryptographic session token bound to an agent |
+| `validate_session` | `(agent_id: str, session_token: str)` | `MCPSession \| None` | Validate agent binding and expiry |
+| `revoke_session` | `(session_token: str)` | `bool` | Revoke one session token |
+| `revoke_all_sessions` | `(agent_id: str)` | `int` | Revoke every session for an agent |
+| `cleanup_expired_sessions` | `()` | `int` | Remove expired sessions and return the number removed |
+| `active_session_count` | property | `int` | Active session count after expiry cleanup |
+
+### `MCPMessageSigner`
+
+| Method / Property | Signature | Returns | Description |
+|-------------------|-----------|---------|-------------|
+| `__init__` | `(signing_key: bytes, replay_window=timedelta(minutes=5), nonce_cache_cleanup_interval=timedelta(minutes=10), max_nonce_cache_size=10000)` | — | Create an HMAC-SHA256 signer/verifier with replay protection |
+| `generate_key` | `static ()` | `bytes` | Generate a new 256-bit shared signing key |
+| `from_base64_key` | `class (base64_key: str)` | `MCPMessageSigner` | Build a signer from a base64-encoded secret |
+| `sign_message` | `(payload: str, sender_id: str \| None = None)` | `MCPSignedEnvelope` | Sign a payload with timestamp and nonce |
+| `verify_message` | `(envelope: MCPSignedEnvelope)` | `MCPVerificationResult` | Verify signature, timestamp window, and nonce replay state |
+| `cleanup_nonce_cache` | `()` | `int` | Remove expired nonces and return the number removed |
+| `cached_nonce_count` | property | `int` | Number of tracked nonces |
+
+### `CredentialRedactor`
+
+| Method | Signature | Returns | Description |
+|--------|-----------|---------|-------------|
+| `redact` | `(value: str \| None)` | `str` | Redact credential-like values from a string |
+| `redact_mapping` | `(mapping: dict[str, Any] \| None)` | `dict[str, Any]` | Redact nested secrets in a mapping |
+| `redact_dictionary` | `(mapping: dict[str, Any] \| None)` | `dict[str, Any]` | Compatibility alias for mapping redaction |
+| `redact_data_structure` | `(value: Any)` | `Any` | Recursively redact strings inside dicts, lists, and tuples |
+| `contains_credentials` | `(value: str \| None)` | `bool` | Return whether any known pattern matches |
+| `detect_credential_types` | `(value: str \| None)` | `list[str]` | Names of detected credential families |
+| `find_matches` | `(value: str \| None)` | `list[CredentialMatch]` | Return structured credential matches |
+
+### `MCPSlidingRateLimiter`
+
+| Method | Signature | Returns | Description |
+|--------|-----------|---------|-------------|
+| `__init__` | `(max_calls_per_window: int = 100, window_size: float = 300.0)` | — | Create a per-agent sliding-window limiter |
+| `try_acquire` | `(agent_id: str)` | `bool` | Reserve budget for the active window |
+| `get_remaining_budget` | `(agent_id: str)` | `int` | Calls remaining in the current window |
+| `get_call_count` | `(agent_id: str)` | `int` | Calls already consumed in the current window |
+| `reset` | `(agent_id: str)` | `None` | Clear one agent's limiter state |
+| `reset_all` | `()` | `None` | Clear all limiter state |
+| `cleanup_expired` | `()` | `int` | Prune expired timestamps and return the number removed |
+
+See also: [MCP Tools & Security Guide](mcp-tools.md) and [OWASP Agentic Top 10 Mapping](owasp-agentic-top10-mapping.md#asi02--tool-misuse--exploitation).
 
 ---
 
