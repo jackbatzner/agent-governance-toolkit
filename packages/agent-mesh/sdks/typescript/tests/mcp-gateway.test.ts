@@ -73,6 +73,7 @@ describe('MCPGateway', () => {
 
   it('rejects pathological blocked regex patterns', () => {
     expect(() => new MCPGateway({
+      // codeql-suppress js/polynomial-redos -- Intentionally pathological regex to test validateRegex rejection
       blockedPatterns: [/(a+)+$/],
     })).toThrow('possible ReDoS');
   });

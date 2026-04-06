@@ -50,6 +50,7 @@ describe('CredentialRedactor', () => {
 
   it('rejects pathological custom regex patterns', () => {
     expect(() => new CredentialRedactor({
+      // codeql-suppress js/polynomial-redos -- Intentionally pathological regex to test validateRegex rejection
       customPatterns: [{ name: 'bad', pattern: /(a+)+$/ }],
     })).toThrow('possible ReDoS');
   });

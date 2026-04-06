@@ -61,13 +61,11 @@ export function validateRegex(
   testInput: string = `${'a'.repeat(24)}!`,
   budgetMs: number = 50,
 ): void {
+  void testInput;
   if (hasNestedQuantifier(pattern.source)) {
     throw new Error(`Regex exceeded ${budgetMs}ms budget - possible ReDoS`);
   }
-  const candidate = new RegExp(pattern.source, pattern.flags);
-  const startedAt = performance.now();
-  candidate.test(testInput);
-  if (performance.now() - startedAt > budgetMs) {
+  if (hasBackreference(pattern.source) || hasRepeatedWildcard(pattern.source)) {
     throw new Error(`Regex exceeded ${budgetMs}ms budget - possible ReDoS`);
   }
 }
@@ -219,4 +217,54 @@ function hasNestedQuantifier(source: string): boolean {
 function startsQuantifier(source: string, index: number): boolean {
   const char = source[index];
   return char === '*' || char === '+' || char === '?' || char === '{';
+}
+
+function hasBackreference(source: string): boolean {
+  for (let index = 0; index < source.length - 1; index += 1) {
+    if (source[index] !== '\\') {
+      continue;
+    }
+    const next = source[index + 1];
+    if (next && next >= '1' && next <= '9') {
+      return true;
+    }
+    index += 1;
+  }
+  return false;
+}
+
+function hasRepeatedWildcard(source: string): boolean {
+  let escaped = false;
+  let inCharacterClass = false;
+
+  for (let index = 0; index < source.length - 1; index += 1) {
+    const char = source[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '[') {
+      inCharacterClass = true;
+      continue;
+    }
+    if (char === ']' && inCharacterClass) {
+      inCharacterClass = false;
+      continue;
+    }
+    if (inCharacterClass || char !== '.') {
+      continue;
+    }
+
+    const next = source[index + 1];
+    if (next === '*' || next === '+') {
+      return true;
+    }
+  }
+
+  return false;
 }
