@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- Added Go MCP API reference, OWASP mapping, tool integration guide, SDK README coverage, and Chinese README links for the new Go MCP security surface.
 
 ## [3.1.0] - 2026-04-11
 

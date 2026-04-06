@@ -1,4 +1,4 @@
-🌍 [English](/README.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
+🌍 [English](../../README.md) | [日本語](./README.ja.md) | [简体中文](./README.zh-CN.md)
 
 ![Agent Governance Toolkit](../../docs/assets/readme-banner.svg)
 
@@ -71,6 +71,8 @@ pip install agentmesh-lightning        # 强化学习训练治理
 - **[.NET SDK](../../packages/agent-governance-dotnet/README.md)** — 提供完整 OWASP 覆盖的 NuGet 包
 - **[Rust SDK](../../packages/agent-mesh/sdks/rust/agentmesh/README.md)** — crates.io 上的库，包含策略、信任、审计及 Ed25519 身份
 - **[Go SDK](../../packages/agent-mesh/sdks/go/README.md)** — 提供策略、信任、审计与身份功能的 Go 模块
+- **[Go MCP 映射文档](../../packages/agent-mesh/sdks/go/docs/owasp-mcp-mapping.md)** — 说明 Go SDK 中 MCP gateway、扫描器与响应防护的 OWASP 覆盖
+- **[Go MCP 独立模块](../../packages/agent-mesh/packages/mcp-governance-go/README.md)** — 面向仅需 MCP 防护能力的独立 Go 模块
 - **[教程](../../docs/tutorials/)** — 涵盖策略、身份、集成、合规、SRE 与沙箱的分步指南
 - **[Azure 部署](../../docs/deployment/README.md)** — 支持 AKS, Azure AI Foundry, Container Apps, OpenClaw 边车
 - **[NVIDIA OpenShell 集成](../../docs/integrations/openshell.md)** — 将沙箱隔离与治理智能相结合
