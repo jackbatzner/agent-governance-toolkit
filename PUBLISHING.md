@@ -111,6 +111,7 @@ See the full list of Microsoft-controlled scopes: `@microsoft`, `@azure`,
 | AgentMesh Copilot Governance | `@microsoft/agentmesh-copilot-governance` | `packages/agentmesh-integrations/copilot-governance` |
 | AgentMesh Mastra | `@microsoft/agentmesh-mastra` | `packages/agentmesh-integrations/mastra-agentmesh` |
 | AgentMesh API | `@microsoft/agentmesh-api` | `packages/agent-mesh/services/api` |
+| AgentMesh MCP Governance | `@microsoft/agentmesh-mcp-governance` | `packages/agent-mesh/packages/mcp-governance` |
 | AgentMesh MCP Proxy | `@microsoft/agentmesh-mcp-proxy` | `packages/agent-mesh/packages/mcp-proxy` |
 | AgentMesh SDK | `@microsoft/agentmesh-sdk` | `packages/agent-mesh/sdks/typescript` |
 | Agent OS Copilot Extension | `@microsoft/agent-os-copilot-extension` | `packages/agent-os/extensions/copilot` |
