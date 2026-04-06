@@ -20,7 +20,7 @@ const BUILTIN_DANGEROUS_PATTERNS = [
   /\b\d{3}-\d{2}-\d{4}\b/gi,
   /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/gi,
   /;\s*(?:rm|del|format|mkfs)\b/gi,
-  /\$\([^)\r\n]*\)/g,
+  /\$\([^)]*\)/g,
   /`[^`]+`/g,
 ];
 

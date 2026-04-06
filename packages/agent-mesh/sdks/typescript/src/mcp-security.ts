@@ -23,9 +23,9 @@ const INVISIBLE_UNICODE_PATTERNS = [
 ];
 
 const HIDDEN_COMMENT_PATTERNS = [
-  /<!--(?:[^-]|-(?!->))*-->/gs,
-  /\[\/\/\]:\s*#\s*\([^)\r\n]*\)/g,
-  /\[comment\]:\s*<>\s*\([^)\r\n]*\)/g,
+  /<!--[^-]*(?:-(?!->)[^-]*)*-->/gs,
+  /\[\/\/\]:#\([^)]*\)/g,
+  /\[comment\]:<>\([^)]*\)/g,
 ];
 
 const HIDDEN_INSTRUCTION_PATTERNS = [
