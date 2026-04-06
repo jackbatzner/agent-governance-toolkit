@@ -119,7 +119,7 @@ Agent OS + ecosystem covers **10 out of 10** [OWASP Agentic Application Security
 | Risk | Coverage | Module |
 |------|----------|--------|
 | ASI01 Agent Goal Hijack | ✅ Full | `GovernancePolicy.blocked_patterns` |
-| ASI02 Tool Misuse | ✅ Full | `MCPGateway` — tool filtering, rate limiting, audit |
+| ASI02 Tool Misuse | ✅ Full | `MCPGateway`, `MCPSecurityScanner`, `MCPResponseScanner`, `CredentialRedactor` |
 | ASI03 Identity & Privilege | ✅ Full | `require_human_approval`, RBAC policies |
 | ASI04 Supply Chain | ✅ Full | AI-BOM v2.0 — model + data + weights provenance |
 | ASI05 Code Execution | ✅ Full | `blocked_patterns`, sandbox integration |
@@ -130,6 +130,72 @@ Agent OS + ecosystem covers **10 out of 10** [OWASP Agentic Application Security
 | ASI10 Rogue Agents | ✅ Full | Agent Runtime kill switch + ring isolation |
 
 > 📄 [Full OWASP mapping →](docs/owasp-agentic-top10-mapping.md)
+
+### MCP security stack (Public Preview)
+
+- `MCPGateway` enforces allow/deny policy, human approval, audit logging, and MCP decision metrics.
+- `MCPSecurityScanner` scans tool metadata for poisoning, rug pulls, and cross-server attacks, and emits MCP scan/threat metrics.
+- `MCPResponseScanner` treats tool output as untrusted input, stripping instruction tags and flagging imperative injections, credential leaks, and exfiltration URLs before results return to an LLM.
+- `MCPSessionAuthenticator` binds cryptographic session tokens to agents with TTL expiry and concurrent-session limits.
+- `MCPMessageSigner` signs MCP payloads with HMAC-SHA256, timestamps, and nonce replay protection.
+- `CredentialRedactor` removes common secrets from strings and nested payloads before they reach logs or audit trails.
+- `MCPSlidingRateLimiter` adds a dedicated per-agent sliding-window limiter for MCP traffic, alongside the existing token-bucket limiter in `integrations/rate_limiter.py`.
+- OpenTelemetry counters: `mcp_decisions`, `mcp_threats_detected`, `mcp_rate_limit_hits`, `mcp_scans`.
+
+Learn more: [MCP Tools & Security Guide](docs/mcp-tools.md#securing-python-mcp-integrations) · [OWASP mapping](docs/owasp-agentic-top10-mapping.md#asi02--tool-misuse--exploitation)
+
+#### Python MCP adoption example
+
+```python
+from agent_os import (
+    CredentialRedactor,
+    MCPGateway,
+    MCPResponseScanner,
+    MCPSecurityScanner,
+)
+from agent_os.integrations.base import GovernancePolicy
+
+policy = GovernancePolicy(
+    name="mcp-production",
+    allowed_tools=["search_docs", "read_repo"],
+    max_tool_calls=50,
+    log_all_calls=True,
+)
+gateway = MCPGateway(policy, sensitive_tools=["write_repo"])
+metadata_scanner = MCPSecurityScanner()
+response_scanner = MCPResponseScanner()
+
+tool_name = "search_docs"
+description = "Search internal product docs."
+schema = {
+    "type": "object",
+    "properties": {"query": {"type": "string"}},
+    "required": ["query"],
+}
+
+# 1. Scan and fingerprint tool metadata when a server registers it.
+threats = metadata_scanner.scan_tool(tool_name, description, schema, server_name="docs-server")
+if threats:
+    raise RuntimeError(threats)
+metadata_scanner.register_tool(tool_name, description, schema, server_name="docs-server")
+
+# 2. Gate every call before invoking the underlying MCP transport.
+allowed, reason = gateway.intercept_tool_call(
+    agent_id="assistant-01",
+    tool_name=tool_name,
+    params={"query": "MCP hardening checklist"},
+)
+if not allowed:
+    raise PermissionError(reason)
+
+# 3. Treat tool output as untrusted before giving it back to the LLM.
+raw_output = "API key: sk-example-secret"
+scan = response_scanner.scan_response(raw_output, tool_name=tool_name)
+sanitized_output, _ = response_scanner.sanitize_response(raw_output, tool_name=tool_name)
+safe_output = CredentialRedactor.redact(sanitized_output)
+assert scan.is_safe is False
+assert safe_output == "API key: [REDACTED]"
+```
 
 ### 🌐 The Agent Governance Ecosystem
 
@@ -500,7 +566,7 @@ summary_hash = await rt.terminate_session(session.sso.session_id)
 | Extension | Description | Status |
 |-----------|-------------|--------|
 | [`mcp-server`](extensions/mcp-server/) | ⭐ **MCP Server** — Works with Claude, Copilot, Cursor (`npx agentos-mcp-server`) | ✅ Published (v1.0.1) |
-| [`vscode`](../../agent-os-vscode/) | VS Code extension with real-time policy checks, enterprise features | ✅ Published (v1.0.1) |
+| [`vscode`](../agent-os-vscode/) | VS Code extension with real-time policy checks, enterprise features | ✅ Published (v1.0.1) |
 | [`copilot`](extensions/copilot/) | GitHub Copilot extension (Vercel/Docker deployment) | ✅ Published (v1.0.0) |
 | [`jetbrains`](extensions/jetbrains/) | IntelliJ, PyCharm, WebStorm plugin (Kotlin) | ✅ Built (v1.0.0) |
 | [`cursor`](extensions/cursor/) | Cursor IDE extension (Composer integration) | ✅ Built (v0.1.0) |
@@ -926,7 +992,7 @@ See [MCP server documentation](extensions/mcp-server/README.md) for full details
 | [Hello Agent OS](notebooks/01-hello-agent-os.ipynb) | Your first governed agent | 5 min |
 | [Episodic Memory](notebooks/02-episodic-memory-demo.ipynb) | Agent memory that persists | 15 min |
 | [Time-Travel Debugging](notebooks/03-time-travel-debugging.ipynb) | Replay and debug decisions | 20 min |
-| [Verification](notebooks/04-verification.ipynb) | Detect hallucinations | 15 min |
+| [Verification](notebooks/04-cross-model-verification.ipynb) | Detect hallucinations | 15 min |
 | [Multi-Agent Coordination](notebooks/05-multi-agent-coordination.ipynb) | Trust between agents | 20 min |
 | [Policy Engine](notebooks/06-policy-engine.ipynb) | Deep dive into policies | 15 min |
 
@@ -936,8 +1002,8 @@ See [MCP server documentation](extensions/mcp-server/README.md) for full details
 - [Kernel Internals](docs/kernel-internals.md) — How the kernel works
 - [Architecture Overview](docs/quickstart.md) — Getting started
 - [Kernel Internals](docs/kernel-internals.md) — How the kernel works
-- [RFC-003: Agent Signals](docs/rfcs/RFC-003-Agent-Signals.md) — POSIX-style signals
-- [RFC-004: Agent Primitives](docs/rfcs/RFC-004-Agent-Primitives.md) — Core primitives
+- [Signal Handling](docs/signal-handling.md) — POSIX-style signals
+- [API Reference](docs/api-reference.md) — Core primitives and contracts
 
 ---
 
