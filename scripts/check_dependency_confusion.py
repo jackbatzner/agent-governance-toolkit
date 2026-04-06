@@ -101,7 +101,7 @@ REGISTERED_NPM_PACKAGES = {
     "@microsoft/agentmesh-api", "@microsoft/agent-os-cursor",
     "@microsoft/agentmesh-mastra", "@microsoft/agentmesh-copilot-governance",
     "@microsoft/agent-os-copilot-extension", "@microsoft/agentos-mcp-server",
-    "@microsoft/agent-os-vscode",
+    "@microsoft/agent-os-vscode", "@microsoft/agentmesh-mcp-governance",
     # Common deps
     "typescript", "tsup", "vitest", "express", "zod", "@mastra/core",
     "@modelcontextprotocol/sdk", "ws", "commander", "chalk",
