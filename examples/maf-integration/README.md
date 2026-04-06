@@ -18,7 +18,9 @@ and run. No shared code, no cross-folder imports.
 | 05 | [**DevOps Deploy**](./05-devops-deploy/) | DevOps | Production deployment gates, destructive operation blocking, deployment storm detection |
 
 Each scenario includes both **Python** and **.NET** implementations with identical
-governance behavior.
+governance behavior. The Rust SDK now ships the equivalent MCP governance
+primitives and docs, but this example set does not yet include Rust scenario
+folders.
 
 ## Quick Start
 
@@ -49,6 +51,20 @@ dotnet run
 # Option B: No setup needed (simulated mode)
 dotnet run
 ```
+
+### Rust MCP
+
+There is not a scenario-local Rust sample in this directory yet. To apply the
+same MCP governance controls from a Rust service or host, start with:
+
+```bash
+cargo add agentmesh-mcp
+```
+
+Then follow:
+
+- [`packages/agent-mesh/sdks/rust/docs/mcp-tools.md`](../../packages/agent-mesh/sdks/rust/docs/mcp-tools.md)
+- [`packages/agent-mesh/sdks/rust/docs/api-reference.md`](../../packages/agent-mesh/sdks/rust/docs/api-reference.md)
 
 ## What You'll See
 
@@ -185,3 +201,4 @@ examples/maf-integration/
 - [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit) — Full governance framework
 - [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) — Agent development SDK
 - [GitHub Models](https://github.com/marketplace/models) — Free LLM access for developers
+- [Rust MCP tools guide](../../packages/agent-mesh/sdks/rust/docs/mcp-tools.md) — Rust quickstart for MCP governance

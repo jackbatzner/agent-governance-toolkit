@@ -50,6 +50,16 @@ npm install @microsoft/agentmesh-sdk
 dotnet add package Microsoft.AgentGovernance
 ```
 
+**Rust** (`agentmesh`)
+```bash
+cargo add agentmesh
+```
+
+**Rust MCP** (`agentmesh-mcp`)
+```bash
+cargo add agentmesh-mcp
+```
+
 <details>
 <summary>安装单独的 Python 软件包</summary>
 
@@ -70,6 +80,9 @@ pip install agentmesh-lightning        # 强化学习训练治理
 - **[TypeScript SDK](../../packages/agent-mesh/sdks/typescript/README.md)** — 提供身份、信任、策略与审计功能的 npm 包
 - **[.NET SDK](../../packages/agent-governance-dotnet/README.md)** — 提供完整 OWASP 覆盖的 NuGet 包
 - **[Rust SDK](../../packages/agent-mesh/sdks/rust/agentmesh/README.md)** — crates.io 上的库，包含策略、信任、审计及 Ed25519 身份
+- **[Rust MCP 指南](../../packages/agent-mesh/sdks/rust/docs/mcp-tools.md)** — 在 Rust 应用中集成 MCP 网关、响应扫描、会话认证、签名与速率限制
+- **[Rust MCP API 参考](../../packages/agent-mesh/sdks/rust/docs/api-reference.md)** — `agentmesh` 与 `agentmesh-mcp` 的公共 MCP 类型说明
+- **[Rust MCP OWASP 映射](../../packages/agent-mesh/sdks/rust/docs/owasp-mcp-mapping.md)** — 对应 OWASP MCP Security Cheat Sheet 的 11/12 节控制映射
 - **[Go SDK](../../packages/agent-mesh/sdks/go/README.md)** — 提供策略、信任、审计与身份功能的 Go 模块
 - **[教程](../../docs/tutorials/)** — 涵盖策略、身份、集成、合规、SRE 与沙箱的分步指南
 - **[Azure 部署](../../docs/deployment/README.md)** — 支持 AKS, Azure AI Foundry, Container Apps, OpenClaw 边车
@@ -86,7 +99,7 @@ pip install agentmesh-lightning        # 强化学习训练治理
 
 - **确定性策略执行**: 每个代理行为在执行 *前* 都会根据策略进行评估，延迟低于毫秒级 (<0.1 ms)
   - [策略引擎](../../packages/agent-os/) | [性能基准](../../BENCHMARKS.md)
-- **零信任代理身份**: 基于 Ed25519 的加密凭证，支持 SPIFFE/SVID，信任评分范围为 0–1000 
+- **零信任代理身份**: 基于 Ed25519 的加密凭证，支持 SPIFFE/SVID，信任评分范围为 0–1000
   - [AgentMesh](../../packages/agent-mesh/) | [信任评分](../../packages/agent-mesh/)
 - **执行沙箱**: 4 层权限环、Saga 编排、终止控制与紧急停止(kill switch)
   - [Agent Runtime](../../packages/agent-runtime/) | [代理虚拟化管理器](../../packages/agent-hypervisor/)

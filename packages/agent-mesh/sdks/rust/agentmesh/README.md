@@ -98,6 +98,15 @@ assert!(result.sanitized.contains("[REDACTED_BEARER_TOKEN]"));
 # Ok::<(), agentmesh_mcp::McpError>(())
 ```
 
+## Documentation
+
+- [MCP tools guide](../docs/mcp-tools.md) - quickstart for scanning tools,
+  gateway enforcement, session auth, and message signing.
+- [MCP API reference](../docs/api-reference.md) - public Rust MCP types for both
+  `agentmesh` and `agentmesh-mcp`.
+- [OWASP MCP mapping](../docs/owasp-mcp-mapping.md) - how the Rust MCP controls
+  map to the OWASP MCP Security Cheat Sheet.
+
 ## API Overview
 
 ### Client (`lib.rs`)

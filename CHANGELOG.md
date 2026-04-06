@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OWASP ASI 2026 Taxonomy Migration** with reference architecture
 - **PromptDefenseEvaluator** — 12-vector prompt audit (#854)
 - **EU AI Act Risk Classifier** (`agentmesh.governance.EUAIActRiskClassifier`) — structured risk classification per Article 6 and Annex III, with Art. 6(1) Annex I safety-component path, Art. 6(3) exemptions, GDPR Art. 4(4) profiling override, and configurable YAML categories for regulatory updates (#756)
+- **Rust MCP governance surfaces** (`agentmesh::mcp` and `agentmesh-mcp`) — documented the standalone crate plus the full-SDK re-export surface for `McpGateway`, `McpSecurityScanner`, `McpResponseScanner`, `McpSessionAuthenticator`, `McpMessageSigner`, `McpSlidingRateLimiter`, `CredentialRedactor`, and categorical MCP metrics.
+- **Enterprise MCP enforcement patterns** — documented persistence seams (`McpSessionStore`, `McpNonceStore`, `McpRateLimitStore`, `McpAuditSink`), injected `Clock` and `NonceGenerator`, atomic nonce/session enforcement, fail-closed decisions, and OWASP MCP Security Cheat Sheet coverage across 11 of 12 sections.
 
 ### Security
 - Patched dependency verification bypass and trust handshake DID forgery (#920)
@@ -45,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `EUAIActRiskClassifier` usage example and API docs to `packages/agent-mesh/README.md`
 - Updated `QUICKSTART.md` and `Tutorial 04 — Audit & Compliance` with secure JSON error handling examples and schema details
 - Added "Secure Error Handling" sections to primary documentation to guide users on interpreting sanitized machine-readable outputs
+- Added Rust MCP API reference, quickstart integration guide, and OWASP MCP mapping under `packages/agent-mesh/sdks/rust/docs/`.
+- Updated the Rust SDK READMEs, `docs/i18n/README.zh-CN.md`, and `examples/maf-integration/README.md` so the Rust MCP documentation is discoverable from existing entry points.
 
 
 ## [3.0.2] - 2026-04-02

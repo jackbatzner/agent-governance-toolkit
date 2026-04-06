@@ -47,6 +47,15 @@ If you also need trust, identity, policy, and audit primitives, install the full
 cargo add agentmesh
 ```
 
+## Documentation
+
+- [MCP tools guide](../docs/mcp-tools.md) - integrate scanning, gateway
+  enforcement, session auth, and message signing into a Rust application.
+- [MCP API reference](../docs/api-reference.md) - public types exported by both
+  `agentmesh` and `agentmesh-mcp`.
+- [OWASP MCP mapping](../docs/owasp-mcp-mapping.md) - section-by-section mapping
+  to the OWASP MCP Security Cheat Sheet.
+
 ## License
 
 See repository root [LICENSE](../../../../../LICENSE).
