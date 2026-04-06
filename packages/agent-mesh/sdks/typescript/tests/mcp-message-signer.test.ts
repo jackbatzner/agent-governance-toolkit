@@ -6,11 +6,13 @@ import {
   MCPMessageSigner,
 } from '../src';
 
+const SHARED_SECRET = '0123456789abcdef0123456789abcdef';
+
 describe('MCPMessageSigner', () => {
   it('signs and verifies envelopes', async () => {
     const nonceStore = new InMemoryMCPNonceStore();
     const signer = new MCPMessageSigner({
-      secret: 'shared-secret',
+      secret: SHARED_SECRET,
       nonceStore,
     });
 
@@ -23,7 +25,7 @@ describe('MCPMessageSigner', () => {
   it('rejects replayed messages', async () => {
     const nonceStore = new InMemoryMCPNonceStore();
     const signer = new MCPMessageSigner({
-      secret: 'shared-secret',
+      secret: SHARED_SECRET,
       nonceStore,
     });
 
@@ -41,7 +43,7 @@ describe('MCPMessageSigner', () => {
       monotonic: () => now,
     };
     const signer = new MCPMessageSigner({
-      secret: 'shared-secret',
+      secret: SHARED_SECRET,
       clock,
       maxClockSkewMs: 100,
     });
@@ -50,7 +52,7 @@ describe('MCPMessageSigner', () => {
     now = 5_000;
 
     const verifier = new MCPMessageSigner({
-      secret: 'shared-secret',
+      secret: SHARED_SECRET,
       clock,
       maxClockSkewMs: 100,
     });
@@ -62,7 +64,7 @@ describe('MCPMessageSigner', () => {
 
   it('rejects tampered payloads', async () => {
     const signer = new MCPMessageSigner({
-      secret: 'shared-secret',
+      secret: SHARED_SECRET,
     });
 
     const envelope = signer.sign({ action: 'read_file' });
@@ -71,5 +73,31 @@ describe('MCPMessageSigner', () => {
 
     expect(verification.valid).toBe(false);
     expect(verification.reason).toContain('Signature mismatch');
+  });
+
+  it('rejects undersized HMAC secrets', () => {
+    expect(() => new MCPMessageSigner({
+      secret: 'too-short',
+    })).toThrow('HMAC secret must be at least 32 bytes');
+  });
+
+  it('fails closed when nonce verification throws', async () => {
+    const signer = new MCPMessageSigner({
+      secret: SHARED_SECRET,
+      nonceStore: {
+        consume: async () => {
+          throw new Error('nonce failure');
+        },
+        reset: () => undefined,
+      },
+    });
+
+    const envelope = signer.sign({ action: 'read_file' });
+    const verification = await signer.verify(envelope);
+
+    expect(verification).toEqual({
+      valid: false,
+      reason: 'Internal error - message rejected (fail-closed)',
+    });
   });
 });

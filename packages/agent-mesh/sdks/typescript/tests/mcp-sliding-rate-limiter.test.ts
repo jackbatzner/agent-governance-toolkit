@@ -37,4 +37,28 @@ describe('MCPSlidingRateLimiter', () => {
     now = 2_000;
     expect((await limiter.consume('agent-1')).allowed).toBe(true);
   });
+
+  it('fails closed when the rate limit store throws', async () => {
+    const limiter = new MCPSlidingRateLimiter({
+      maxRequests: 1,
+      windowMs: 1_000,
+    });
+    Object.defineProperty(limiter as object, 'store', {
+      value: {
+        get: async () => {
+          throw new Error('store failed');
+        },
+        set: async () => undefined,
+      },
+    });
+
+    await expect(limiter.consume('agent-1')).resolves.toEqual({
+      allowed: false,
+      count: 0,
+      limit: 1,
+      remaining: 0,
+      resetAt: 1_000,
+      retryAfterMs: 1_000,
+    });
+  });
 });

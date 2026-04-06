@@ -63,4 +63,30 @@ describe('MCPSecurityScanner', () => {
 
     expect(threats.some((threat) => threat.threatType === MCPThreatType.CrossServerAttack)).toBe(true);
   });
+
+  it('fails closed when the regex scan budget is exceeded', () => {
+    const scanner = new MCPSecurityScanner({
+      clock: {
+        now: () => 0,
+        monotonic: (() => {
+          let tick = 0;
+          return () => {
+            tick += 200;
+            return tick;
+          };
+        })(),
+      },
+      scanTimeoutMs: 100,
+    });
+
+    const threats = scanner.scanTool('search', 'Search the web', undefined, 'server-a');
+
+    expect(threats).toEqual([{
+      threatType: MCPThreatType.ToolPoisoning,
+      severity: MCPSeverity.Critical,
+      toolName: 'search',
+      serverName: 'server-a',
+      message: 'Scan error - tool rejected (fail-closed)',
+    }]);
+  });
 });

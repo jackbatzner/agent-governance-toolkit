@@ -47,23 +47,34 @@ export class MCPSlidingRateLimiter {
   }
 
   async consume(agentId: string): Promise<MCPSlidingRateLimitResult> {
-    const now = toTimestamp(this.clock.now());
-    const bucket = await this.prune(agentId, now);
-    bucket.push(now);
-    await this.store.set(agentId, bucket);
+    try {
+      const now = toTimestamp(this.clock.now());
+      const bucket = await this.prune(agentId, now);
+      bucket.push(now);
+      await this.store.set(agentId, bucket);
 
-    const resetAt = bucket[0] + this.windowMs;
-    const allowed = bucket.length <= this.maxRequests;
-    const remaining = Math.max(this.maxRequests - bucket.length, 0);
+      const resetAt = bucket[0] + this.windowMs;
+      const allowed = bucket.length <= this.maxRequests;
+      const remaining = Math.max(this.maxRequests - bucket.length, 0);
 
-    return {
-      allowed,
-      count: bucket.length,
-      limit: this.maxRequests,
-      remaining,
-      resetAt,
-      retryAfterMs: allowed ? 0 : Math.max(resetAt - now, 0),
-    };
+      return {
+        allowed,
+        count: bucket.length,
+        limit: this.maxRequests,
+        remaining,
+        resetAt,
+        retryAfterMs: allowed ? 0 : Math.max(resetAt - now, 0),
+      };
+    } catch {
+      return {
+        allowed: false,
+        count: 0,
+        limit: this.maxRequests,
+        remaining: 0,
+        resetAt: 1_000,
+        retryAfterMs: 1_000,
+      };
+    }
   }
 
   async reset(agentId?: string): Promise<void> {

@@ -14,6 +14,7 @@ import {
   MCPSlidingRateLimitResult,
   MCPWrappedServerConfig,
 } from './types';
+import { createRegexScanBudget, DEFAULT_MCP_CLOCK } from './mcp-utils';
 
 const BUILTIN_DANGEROUS_PATTERNS = [
   /\b\d{3}-\d{2}-\d{4}\b/gi,
@@ -45,6 +46,8 @@ export class MCPGateway {
   private readonly policyEvaluator?: MCPGatewayConfig['policyEvaluator'];
   private readonly metrics?: MCPGatewayConfig['metrics'];
   private readonly auditSink?: MCPAuditSink;
+  private readonly clock: NonNullable<MCPGatewayConfig['clock']>;
+  private readonly scanTimeoutMs: number;
   private readonly rateLimiter?: {
     consume(agentId: string): MCPMaybePromise<MCPSlidingRateLimitResult>;
   };
@@ -61,6 +64,8 @@ export class MCPGateway {
     this.policyEvaluator = config.policyEvaluator;
     this.metrics = config.metrics;
     this.auditSink = config.auditSink;
+    this.clock = config.clock ?? DEFAULT_MCP_CLOCK;
+    this.scanTimeoutMs = config.scanTimeoutMs ?? 100;
     this.rateLimiter =
       config.rateLimiter
       ?? (config.rateLimit
@@ -273,8 +278,10 @@ export class MCPGateway {
     params: Record<string, unknown>,
   ): MCPResponseFinding | undefined {
     const serialized = JSON.stringify(params);
+    const budget = createRegexScanBudget(this.clock, this.scanTimeoutMs);
 
     for (const pattern of this.blockedPatterns) {
+      budget.checkpoint('Regex scan exceeded time budget - access denied');
       if (
         (typeof pattern === 'string' && serialized.includes(pattern))
         || (pattern instanceof RegExp && pattern.test(serialized))
@@ -291,6 +298,7 @@ export class MCPGateway {
 
     if (this.enableBuiltinSanitization) {
       for (const pattern of BUILTIN_DANGEROUS_PATTERNS) {
+        budget.checkpoint('Regex scan exceeded time budget - access denied');
         if (pattern.test(serialized)) {
           return {
             type: 'imperative_language',

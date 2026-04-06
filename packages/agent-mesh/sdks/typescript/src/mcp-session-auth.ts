@@ -12,6 +12,7 @@ import {
 import {
   DEFAULT_MCP_CLOCK,
   createHmacHex,
+  normalizeSecret,
   randomNonce,
   stableStringify,
   toTimestamp,
@@ -59,6 +60,10 @@ export class MCPSessionAuthenticator {
   private readonly sessionOwners = new Map<string, string>();
 
   constructor(config: MCPSessionAuthConfig) {
+    const key = normalizeSecret(config.secret);
+    if (key.length < 32) {
+      throw new Error('HMAC secret must be at least 32 bytes');
+    }
     this.config = {
       ...config,
       ttlMs: config.ttlMs ?? DEFAULT_TTL_MS,

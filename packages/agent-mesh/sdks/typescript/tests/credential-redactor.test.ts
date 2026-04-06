@@ -37,4 +37,14 @@ describe('CredentialRedactor', () => {
       '$.nested.connectionString',
     ]);
   });
+
+  it('redacts PEM blocks', () => {
+    const redactor = new CredentialRedactor();
+    const result = redactor.redactString(
+      '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----',
+    );
+
+    expect(result.redacted).toBe('[REDACTED]');
+    expect(result.redactions[0]?.type).toBe('pem_block');
+  });
 });

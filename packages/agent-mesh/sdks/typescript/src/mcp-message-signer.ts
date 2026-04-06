@@ -10,6 +10,7 @@ import {
 import {
   DEFAULT_MCP_CLOCK,
   createHmacHex,
+  normalizeSecret,
   randomNonce,
   stableStringify,
   toTimestamp,
@@ -64,6 +65,10 @@ export class MCPMessageSigner {
   private readonly nonceStore: MCPNonceStore;
 
   constructor(config: MCPMessageSignerConfig) {
+    const key = normalizeSecret(config.secret);
+    if (key.length < 32) {
+      throw new Error('HMAC secret must be at least 32 bytes');
+    }
     this.config = {
       ...config,
       maxClockSkewMs: config.maxClockSkewMs ?? DEFAULT_MAX_CLOCK_SKEW_MS,
@@ -94,38 +99,45 @@ export class MCPMessageSigner {
   async verify<T>(
     envelope: MCPMessageEnvelope<T>,
   ): Promise<MCPMessageVerificationResult<T>> {
-    const expectedSignature = this.computeSignature(
-      envelope.payload,
-      envelope.timestamp,
-      envelope.nonce,
-      envelope.keyId,
-    );
-    if (!timingSafeEqualHex(envelope.signature, expectedSignature)) {
-      return { valid: false, reason: 'Signature mismatch' };
-    }
+    try {
+      const expectedSignature = this.computeSignature(
+        envelope.payload,
+        envelope.timestamp,
+        envelope.nonce,
+        envelope.keyId,
+      );
+      if (!timingSafeEqualHex(envelope.signature, expectedSignature)) {
+        return { valid: false, reason: 'Signature mismatch' };
+      }
 
-    const now = toTimestamp((this.config.clock ?? DEFAULT_MCP_CLOCK).now());
-    if (
-      Math.abs(now - envelope.timestamp)
-      > this.config.maxClockSkewMs
-    ) {
-      return { valid: false, reason: 'Timestamp outside accepted skew window' };
-    }
+      const now = toTimestamp((this.config.clock ?? DEFAULT_MCP_CLOCK).now());
+      if (
+        Math.abs(now - envelope.timestamp)
+        > this.config.maxClockSkewMs
+      ) {
+        return { valid: false, reason: 'Timestamp outside accepted skew window' };
+      }
 
-    const scope = envelope.keyId ?? 'default';
-    const accepted = await this.nonceStore.consume(
-      scope,
-      envelope.nonce,
-      envelope.timestamp + this.config.nonceTtlMs,
-    );
-    if (!accepted) {
-      return { valid: false, reason: 'Replay detected' };
-    }
+      const scope = envelope.keyId ?? 'default';
+      const accepted = await this.nonceStore.consume(
+        scope,
+        envelope.nonce,
+        envelope.timestamp + this.config.nonceTtlMs,
+      );
+      if (!accepted) {
+        return { valid: false, reason: 'Replay detected' };
+      }
 
-    return {
-      valid: true,
-      envelope,
-    };
+      return {
+        valid: true,
+        envelope,
+      };
+    } catch {
+      return {
+        valid: false,
+        reason: 'Internal error - message rejected (fail-closed)',
+      };
+    }
   }
 
   private computeSignature(
