@@ -1,0 +1,26 @@
+{
+  "name": "mcp-express-server-example",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Public Preview — Express.js MCP governance example for the AgentMesh TypeScript SDK",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "tsx --test test/server.test.ts"
+  },
+  "peerDependencies": {
+    "@microsoft/agentmesh-sdk": "3.0.2"
+  },
+  "dependencies": {
+    "express": "4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.3",
+    "@types/node": "25.5.0",
+    "tsx": "4.19.3",
+    "typescript": "5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
