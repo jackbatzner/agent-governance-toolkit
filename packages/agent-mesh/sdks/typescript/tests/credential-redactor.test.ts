@@ -47,4 +47,10 @@ describe('CredentialRedactor', () => {
     expect(result.redacted).toBe('[REDACTED]');
     expect(result.redactions[0]?.type).toBe('pem_block');
   });
+
+  it('rejects pathological custom regex patterns', () => {
+    expect(() => new CredentialRedactor({
+      customPatterns: [{ name: 'bad', pattern: /(a+)+$/ }],
+    })).toThrow('possible ReDoS');
+  });
 });

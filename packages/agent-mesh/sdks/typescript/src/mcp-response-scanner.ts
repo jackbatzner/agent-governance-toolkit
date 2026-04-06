@@ -10,6 +10,7 @@ import {
   MCPResponseScannerConfig,
 } from './types';
 import {
+  debugSecurityFailure,
   createRegexScanBudget,
   isRecord,
   truncatePreview,
@@ -82,7 +83,8 @@ export class MCPResponseScanner {
         original: value,
         sanitized,
       };
-    } catch {
+    } catch (error) {
+      debugSecurityFailure(this.config.logger, 'responseScanner.scan', error);
       const findings: MCPResponseFinding[] = [{
         type: 'instruction_injection',
         severity: 'critical',

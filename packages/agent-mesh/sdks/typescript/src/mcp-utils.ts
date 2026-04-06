@@ -7,7 +7,7 @@ import {
   timingSafeEqual,
 } from 'crypto';
 import { performance } from 'perf_hooks';
-import { MCPClock } from './types';
+import { MCPClock, MCPDebugLogger } from './types';
 
 const DEFAULT_REGEX_SCAN_TIMEOUT_MS = 100;
 
@@ -54,6 +54,33 @@ export function createRegexScanBudget(
   timeoutMs?: number,
 ): RegexScanBudget {
   return new RegexScanBudget(clock ?? DEFAULT_MCP_CLOCK, timeoutMs ?? DEFAULT_REGEX_SCAN_TIMEOUT_MS);
+}
+
+export function validateRegex(
+  pattern: RegExp,
+  testInput: string = `${'a'.repeat(24)}!`,
+  budgetMs: number = 50,
+): void {
+  if (hasNestedQuantifier(pattern.source)) {
+    throw new Error(`Regex exceeded ${budgetMs}ms budget - possible ReDoS`);
+  }
+  const candidate = new RegExp(pattern.source, pattern.flags);
+  const startedAt = performance.now();
+  candidate.test(testInput);
+  if (performance.now() - startedAt > budgetMs) {
+    throw new Error(`Regex exceeded ${budgetMs}ms budget - possible ReDoS`);
+  }
+}
+
+export function debugSecurityFailure(
+  logger: MCPDebugLogger | undefined,
+  gate: string,
+  error: unknown,
+): void {
+  logger?.debug?.('Security gate failed closed', {
+    gate,
+    error: error instanceof Error ? error.message : String(error),
+  });
 }
 
 export function randomNonce(size: number = 18): string {
@@ -146,4 +173,8 @@ function canonicalize(
   }
 
   return String(value);
+}
+
+function hasNestedQuantifier(source: string): boolean {
+  return /\((?:[^()\\]|\\.)*[+*{][^()]*\)[+*{?]/.test(source);
 }

@@ -70,4 +70,30 @@ describe('MCPGateway', () => {
       apiKey: '[REDACTED]',
     });
   });
+
+  it('rejects pathological blocked regex patterns', () => {
+    expect(() => new MCPGateway({
+      blockedPatterns: [/(a+)+$/],
+    })).toThrow('possible ReDoS');
+  });
+
+  it('logs when the security gate fails closed', async () => {
+    const debug = jest.fn();
+    const gateway = new MCPGateway({
+      logger: { debug },
+      rateLimiter: {
+        consume: async () => {
+          throw new Error('rate limit store failed');
+        },
+      },
+    });
+
+    const result = await gateway.evaluateToolCall('agent-1', 'search', {});
+
+    expect(result.allowed).toBe(false);
+    expect(debug).toHaveBeenCalledWith('Security gate failed closed', {
+      gate: 'gateway.evaluateToolCall',
+      error: 'rate limit store failed',
+    });
+  });
 });

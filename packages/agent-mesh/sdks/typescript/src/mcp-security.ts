@@ -12,7 +12,11 @@ import {
   MCPToolDefinition,
   ToolFingerprint,
 } from './types';
-import { createRegexScanBudget, DEFAULT_MCP_CLOCK } from './mcp-utils';
+import {
+  createRegexScanBudget,
+  debugSecurityFailure,
+  DEFAULT_MCP_CLOCK,
+} from './mcp-utils';
 
 const INVISIBLE_UNICODE_PATTERNS = [
   /[\u200b\u200c\u200d\ufeff]/g,
@@ -84,7 +88,8 @@ const SUSPICIOUS_DECODED_KEYWORDS = [
 export class MCPSecurityScanner {
   private readonly toolRegistry = new Map<string, ToolFingerprint>();
   private readonly auditRecords: MCPScanAuditRecord[] = [];
-  private readonly config: Required<Pick<MCPSecurityScannerConfig, 'clock' | 'scanTimeoutMs'>>;
+  private readonly config: Required<Pick<MCPSecurityScannerConfig, 'clock' | 'scanTimeoutMs'>>
+    & MCPSecurityScannerConfig;
 
   constructor(config: MCPSecurityScannerConfig = {}) {
     this.config = {
@@ -116,7 +121,8 @@ export class MCPSecurityScanner {
 
       this.recordAudit('scan_tool', toolName, serverName, threats);
       return threats;
-    } catch {
+    } catch (error) {
+      debugSecurityFailure(this.config.logger, 'securityScanner.scanTool', error);
       return [{
         threatType: MCPThreatType.ToolPoisoning,
         severity: MCPSeverity.Critical,

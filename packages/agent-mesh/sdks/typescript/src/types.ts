@@ -216,6 +216,7 @@ export interface MCPResponseScannerConfig {
   suspiciousHosts?: string[];
   clock?: MCPClock;
   scanTimeoutMs?: number;
+  logger?: MCPDebugLogger;
 }
 
 export interface MCPResponseScanResult<T = unknown> {
@@ -243,6 +244,7 @@ export interface CredentialRedactorConfig {
   replacementText?: string;
   redactSensitiveKeys?: boolean;
   customPatterns?: CredentialPatternDefinition[];
+  logger?: MCPDebugLogger;
 }
 
 export interface CredentialRedactionResult<T = unknown> {
@@ -253,6 +255,10 @@ export interface CredentialRedactionResult<T = unknown> {
 export interface MCPClock {
   now(): number | Date;
   monotonic?(): number;
+}
+
+export interface MCPDebugLogger {
+  debug?(message: string, details?: Record<string, unknown>): void;
 }
 
 export interface MCPSessionTokenPayload {
@@ -291,6 +297,7 @@ export interface MCPSessionAuthConfig {
   maxClockSkewMs?: number;
   clock?: MCPClock;
   sessionStore?: MCPSessionStore;
+  logger?: MCPDebugLogger;
 }
 
 export interface MCPSessionIssueResult {
@@ -328,6 +335,7 @@ export interface MCPMessageSignerConfig {
   nonceTtlMs?: number;
   clock?: MCPClock;
   nonceStore?: MCPNonceStore;
+  logger?: MCPDebugLogger;
 }
 
 export interface MCPMessageVerificationResult<T = unknown> {
@@ -340,6 +348,7 @@ export interface MCPSlidingRateLimitConfig {
   maxRequests: number;
   windowMs: number;
   clock?: MCPClock;
+  logger?: MCPDebugLogger;
 }
 
 export interface MCPSlidingRateLimitResult {
@@ -456,6 +465,7 @@ export interface MCPGatewayConfig {
   enableBuiltinSanitization?: boolean;
   clock?: MCPClock;
   scanTimeoutMs?: number;
+  logger?: MCPDebugLogger;
   policyEvaluator?: {
     evaluate(action: string, context?: Record<string, unknown>): LegacyPolicyDecision;
   };
@@ -484,6 +494,7 @@ export interface MCPGatewayDecisionResult {
 export interface MCPSecurityScannerConfig {
   clock?: MCPClock;
   scanTimeoutMs?: number;
+  logger?: MCPDebugLogger;
 }
 
 export interface MCPGatewayAuditEntry {

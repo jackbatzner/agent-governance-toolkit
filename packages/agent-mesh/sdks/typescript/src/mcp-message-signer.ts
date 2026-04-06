@@ -9,6 +9,7 @@ import {
 } from './types';
 import {
   DEFAULT_MCP_CLOCK,
+  debugSecurityFailure,
   createHmacHex,
   normalizeSecret,
   randomNonce,
@@ -132,7 +133,8 @@ export class MCPMessageSigner {
         valid: true,
         envelope,
       };
-    } catch {
+    } catch (error) {
+      debugSecurityFailure(this.config.logger, 'messageSigner.verify', error);
       return {
         valid: false,
         reason: 'Internal error - message rejected (fail-closed)',
