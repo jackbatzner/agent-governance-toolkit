@@ -41,7 +41,10 @@ REGISTERED_PACKAGES = {
     "redis", "sqlalchemy", "asyncpg", "chromadb", "pinecone-client",
     "sentence-transformers", "prometheus-client", "opentelemetry-api",
     "opentelemetry-sdk", "fhir.resources", "hl7apy", "zenpy", "freshdesk",
-    "google-adk", "safety", "jupyter", "vitest", "tsup", "typescript",
+    "google-adk", "openai-agents", "safety", "jupyter", "vitest", "tsup", "typescript",
+    "smolagents",
+    # False positives (file references in pip install -r)
+    "requirements.txt",
     # Dashboard / visualization (used in examples)
     "streamlit", "plotly", "pandas", "networkx", "matplotlib", "pyvis",
     # Async / caching (used in examples)
