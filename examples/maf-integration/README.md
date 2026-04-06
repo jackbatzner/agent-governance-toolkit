@@ -7,6 +7,96 @@ middleware to enforce governance policies on AI agents in real-world scenarios.
 Each scenario is **fully self-contained** — copy any folder, install dependencies,
 and run. No shared code, no cross-folder imports.
 
+## Integration Pattern
+
+AGT plugs into your MAF agent pipeline as **deterministic middleware** — no extra
+LLM calls, no latency surprises. Every check is pure rule evaluation:
+
+```
+Your MAF Agent Pipeline
+    │
+    ▼
+┌─────────────────────────────────┐
+│ AGT Governance Middleware       │  ← Deterministic, no LLM
+│ (plugs into MAF middleware)     │
+│                                 │
+│  1. Policy Engine (YAML rules)  │
+│  2. Capability Guard (tools)    │
+│  3. Rogue Detector (behavior)   │
+│  4. Audit Trail (Merkle chain)  │
+└─────────────────────────────────┘
+    │
+    ▼  (only if governance passes)
+Your LLM Call
+```
+
+### Add AGT to an existing MAF project in 3 steps
+
+**Step 1 — Install the toolkit**
+
+```bash
+pip install agent-governance-toolkit[full]
+```
+
+**Step 2 — Define policies in YAML**
+
+Create a file such as `policies/governance.yaml`:
+
+```yaml
+version: "1.0"
+rules:
+  - name: "block_pii"
+    condition:
+      field: "message"
+      operator: "contains_any"
+      value: "SSN,social security,credit card number"
+    action: "deny"
+    priority: 100
+    message: "PII detected — request blocked before reaching the LLM"
+
+  - name: "spending_limit"
+    condition:
+      field: "message"
+      operator: "contains_any"
+      value: "approve loan,loan approval"
+    action: "deny"
+    priority: 90
+    message: "Loan approvals over $50,000 require human review"
+```
+
+**Step 3 — Add middleware to your MAF pipeline**
+
+```python
+from agent_governance_toolkit import PolicyEngine, GovernancePolicyMiddleware, AuditTrail
+
+engine = PolicyEngine("policies/governance.yaml")
+audit  = AuditTrail()
+gov_mw = GovernancePolicyMiddleware(engine, audit)
+
+# In your MAF pipeline, call governance before the LLM:
+result = gov_mw.evaluate(user_message)
+if result.denied:
+    return result.message          # blocked — never reaches the LLM
+# ... proceed to LLM call ...
+```
+
+That's it. Every request now passes through deterministic policy checks before
+any LLM interaction, and every decision is recorded in a tamper-proof Merkle-
+chained audit log.
+
+## Two Ways to Run
+
+Each scenario supports two execution modes so you can experiment with or without
+an API key:
+
+| Mode | How to run | What happens |
+|------|-----------|--------------|
+| **Simulated** (default) | `python main.py` | Uses built-in simulated LLM responses — no API key needed. Great for exploring governance behavior. |
+| **Live LLM** | Set `GITHUB_TOKEN` or `OPENAI_API_KEY`, then `python main.py` | Sends real requests to an LLM. Governance middleware still runs identically. |
+
+> **Tip:** Start with simulated mode to understand the governance pipeline, then
+> switch to live LLM calls to see the same policies enforced on real model output.
+
 ## Scenarios
 
 | # | Scenario | Industry | What it demonstrates |
