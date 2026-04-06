@@ -16,6 +16,7 @@ GitHub
 GOPROXY
 HEALTHCHECK
 healthz
+helpdesk
 IATP
 idweb
 kanish
@@ -38,9 +39,12 @@ pmcrepo
 privatelink
 pypdf
 pyproject
+quickstarts
 rrdatas
+sandboxing
 SCAK
 SemanticKernel
+smolagents
 serde
 spacy
 spellcheck
