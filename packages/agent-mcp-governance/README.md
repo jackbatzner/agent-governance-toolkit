@@ -1,18 +1,22 @@
-<!-- Copyright (c) Microsoft Corporation. -->
-<!-- Licensed under the MIT License. -->
+<!--
+Copyright (c) Microsoft Corporation.
+Licensed under the MIT License.
+-->
 
 # agent-mcp-governance
 
-> **Public Preview** — Standalone Python package that exposes the
-> Agent Governance Toolkit's MCP (Model Context Protocol) governance
-> primitives for use outside the full AGT monorepo.
+`agent-mcp-governance` is a standalone **Public Preview** package that exposes
+the MCP governance primitives used in this repository:
 
-## Overview
+- `MCPGateway` for policy enforcement and audit logging
+- `MCPSlidingRateLimiter` for per-agent call budgets
+- `MCPSessionAuthenticator` for short-lived MCP sessions
+- `MCPMessageSigner`, `MCPSecurityScanner`, and `MCPResponseScanner` for
+  message integrity and security scanning
 
-`agent_mcp_governance` provides a thin, typed re-export surface over the
-governance, audit, and trust modules in
-[`agent-os-kernel`](https://pypi.org/project/agent-os-kernel/).  It is
-**not** zero-dependency — it requires `agent-os-kernel >=3.0.0,<4.0.0`.
+This package is intentionally thin. It exists as a focused MCP governance
+surface for enterprise packaging and reuse scenarios without pulling in the
+full Agent Governance Toolkit as an install-time dependency.
 
 ## Installation
 
@@ -20,52 +24,52 @@ governance, audit, and trust modules in
 pip install agent-mcp-governance
 ```
 
-This will pull in `agent-os-kernel` automatically.
-
-## Quick Start
+## Quick usage
 
 ```python
 from agent_mcp_governance import (
-    GovernanceMiddleware,
-    AuditMiddleware,
-    TrustGate,
-    BehaviorMonitor,
+    MCPGateway,
+    MCPSessionAuthenticator,
+    MCPSlidingRateLimiter,
 )
 
-# 1. Governance — block prompt-injection patterns
-gov = GovernanceMiddleware(
-    blocked_patterns=[r"(?i)ignore previous instructions"],
-    allowed_tools=["web-search", "read-file"],
-    rate_limit_per_minute=60,
-)
 
-# 2. Audit — tamper-evident hash-chain logging
-audit = AuditMiddleware(capture_data=True)
+class DemoPolicy:
+    name = "demo"
+    allowed_tools = ["read_file", "web_search"]
+    max_tool_calls = 10
+    log_all_calls = True
+    require_human_approval = False
 
-# 3. Trust — DID-based agent identity verification
-gate = TrustGate(min_trust_score=500)
+    def matches_pattern(self, _text: str) -> list[str]:
+        return []
 
-# 4. Monitoring — detect rogue agents
-monitor = BehaviorMonitor(
-    burst_threshold=100,
-    consecutive_failure_threshold=20,
-)
+
+policy = DemoPolicy()
+gateway = MCPGateway(policy)
+rate_limiter = MCPSlidingRateLimiter(max_calls_per_window=5, window_size=60.0)
+session_auth = MCPSessionAuthenticator()
+
+token = session_auth.create_session("agent-123", user_id="alice@example.com")
+session = session_auth.validate_session("agent-123", token)
+
+if session and rate_limiter.try_acquire(session.rate_limit_key):
+    allowed, reason = gateway.intercept_tool_call(
+        session.agent_id,
+        "read_file",
+        {"path": "docs/architecture.md"},
+    )
+    print(allowed, reason)
 ```
 
-## API Reference
+The package is intentionally thin and depends on
+[`agent-os-kernel`](https://pypi.org/project/agent-os-kernel/) for the
+underlying implementations.
 
-| Export | Source module | Description |
-|--------|-------------|-------------|
-| `GovernanceMiddleware` | `agent_os.governance.middleware` | Policy enforcement (rate limits, allow-lists, content filters) |
-| `AuditMiddleware` | `agent_os.audit.middleware` | Tamper-evident audit logging with hash chain |
-| `TrustGate` | `agent_os.trust.gate` | DID-based trust verification for agent handoffs |
-| `BehaviorMonitor` | `agent_os.services.behavior_monitor` | Per-agent anomaly detection and quarantine |
+## Security guidance
 
-## Compatibility
-
-| Python | agent-os-kernel |
-|--------|----------------|
-| ≥ 3.10 | ≥ 3.0.0, < 4.0.0 |
+For deployment guidance and hardening recommendations, see the
+[OWASP MCP Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html).
 
 ## License
 

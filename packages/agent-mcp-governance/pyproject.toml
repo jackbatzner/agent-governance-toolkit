@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agent_mcp_governance"
 version = "0.1.0"
-description = "Public Preview — MCP governance primitives for the Agent Governance Toolkit."
+description = "Public Preview — MCP governance APIs for sessions, signing, scanning, and gateway enforcement."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Microsoft Corporation", email = "agentgovtoolkit@microsoft.com"}]

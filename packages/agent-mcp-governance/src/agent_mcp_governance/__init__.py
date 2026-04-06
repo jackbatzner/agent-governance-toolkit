@@ -1,25 +1,70 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-"""agent_mcp_governance — MCP governance primitives for the Agent Governance Toolkit.
-
-Re-exports the core governance, audit, trust, and monitoring classes from
-``agent-os-kernel`` so that downstream consumers can depend on a single,
-focused package.
-"""
+"""Thin MCP governance re-exports for standalone packaging."""
 
 from __future__ import annotations
 
 __version__ = "0.1.0"
 
-from agent_os.governance.middleware import GovernanceMiddleware
-from agent_os.audit.middleware import AuditMiddleware
-from agent_os.trust.gate import TrustGate
-from agent_os.services.behavior_monitor import BehaviorMonitor
+from agent_os.credential_redactor import CredentialMatch, CredentialPattern, CredentialRedactor
+from agent_os.mcp_gateway import ApprovalStatus, AuditEntry, GatewayConfig, MCPGateway
+from agent_os.mcp_message_signer import MCPMessageSigner, MCPSignedEnvelope, MCPVerificationResult
+from agent_os.mcp_protocols import (
+    InMemoryAuditSink,
+    InMemoryNonceStore,
+    InMemoryRateLimitStore,
+    InMemorySessionStore,
+    MCPAuditSink,
+    MCPNonceStore,
+    MCPRateLimitStore,
+    MCPSessionStore,
+)
+from agent_os.mcp_response_scanner import (
+    MCPResponseScanner,
+    MCPResponseScanResult,
+    MCPResponseThreat,
+)
+from agent_os.mcp_security import (
+    MCPSeverity,
+    MCPSecurityScanner,
+    MCPThreat,
+    MCPThreatType,
+    ScanResult,
+    ToolFingerprint,
+)
+from agent_os.mcp_session_auth import MCPSession, MCPSessionAuthenticator
+from agent_os.mcp_sliding_rate_limiter import MCPSlidingRateLimiter
 
 __all__ = [
     "__version__",
-    "GovernanceMiddleware",
-    "AuditMiddleware",
-    "TrustGate",
-    "BehaviorMonitor",
+    "ApprovalStatus",
+    "AuditEntry",
+    "CredentialMatch",
+    "CredentialPattern",
+    "CredentialRedactor",
+    "GatewayConfig",
+    "InMemoryAuditSink",
+    "InMemoryNonceStore",
+    "InMemoryRateLimitStore",
+    "InMemorySessionStore",
+    "MCPAuditSink",
+    "MCPGateway",
+    "MCPMessageSigner",
+    "MCPNonceStore",
+    "MCPRateLimitStore",
+    "MCPResponseScanResult",
+    "MCPResponseScanner",
+    "MCPResponseThreat",
+    "MCPSecurityScanner",
+    "MCPSeverity",
+    "MCPSession",
+    "MCPSessionAuthenticator",
+    "MCPSessionStore",
+    "MCPSignedEnvelope",
+    "MCPSlidingRateLimiter",
+    "MCPThreat",
+    "MCPThreatType",
+    "MCPVerificationResult",
+    "ScanResult",
+    "ToolFingerprint",
 ]
