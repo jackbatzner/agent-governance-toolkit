@@ -1,14 +1,17 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
-CrewAI + Governance Toolkit — Getting Started
-==============================================
+CrewAI + Governance Toolkit — Simulated Demo (No Dependencies Required)
+=======================================================================
 
 Minimal example showing how to add governance to an existing CrewAI
-workflow. Copy this pattern into your own project.
+workflow using simulated context objects. No external dependencies needed.
 
     pip install agent-governance-toolkit[full]
-    python examples/crewai-governed/getting_started.py
+    python examples/crewai-governed/demo_simulated.py
+
+This demo runs without CrewAI installed. For real CrewAI integration,
+see getting_started.py.
 
 What this demonstrates:
   1. Load YAML governance policies
@@ -91,7 +94,7 @@ class ToolContext:
 
 async def main() -> None:
     print("=" * 55)
-    print("  CrewAI + Governance Toolkit — Getting Started")
+    print("  CrewAI + Governance Toolkit — Simulated Demo")
     print("=" * 55)
 
     # --- Check 1: Safe message passes policy ---

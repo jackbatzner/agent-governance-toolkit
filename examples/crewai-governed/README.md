@@ -9,6 +9,23 @@
 
 ![CrewAI Governance Demo](demo.gif)
 
+## Two Ways to Run
+
+| Script | What it does | Dependencies |
+|--------|-------------|--------------|
+| `getting_started.py` | **Real CrewAI integration** — creates actual CrewAI `Agent`/`Task`/`Crew` objects with governance middleware | `pip install crewai agent-governance-toolkit[full]` |
+| `demo_simulated.py` | **No-dependency version** — demonstrates the same governance concepts using lightweight context shims (no CrewAI required) | `pip install agent-governance-toolkit[full]` |
+
+```bash
+# Real CrewAI integration (requires crewai)
+pip install -r examples/crewai-governed/requirements.txt
+python examples/crewai-governed/getting_started.py
+
+# No-dependency simulated version
+pip install agent-governance-toolkit[full]
+python examples/crewai-governed/demo_simulated.py
+```
+
 ## Quick Start (< 2 minutes)
 
 ```bash
@@ -16,8 +33,8 @@ pip install agent-governance-toolkit[full]
 python examples/crewai-governed/getting_started.py
 ```
 
-`getting_started.py` is a **~120-line** copy-paste-friendly example showing
-the core integration pattern:
+`getting_started.py` shows real CrewAI integration with governance — creating
+actual `Agent` and `Crew` objects wrapped in AGT middleware. The core pattern:
 
 ```python
 from agent_os.policies.evaluator import PolicyEvaluator
@@ -217,8 +234,10 @@ Demonstrates the cryptographic integrity guarantees of the audit trail:
 
 | File | Purpose |
 |------|---------|
-| `getting_started.py` | **Start here** — minimal integration example (~120 lines) |
+| `getting_started.py` | **Start here** — real CrewAI integration with governance middleware |
+| `demo_simulated.py` | No-dependency version — same governance concepts without CrewAI |
 | `crewai_governance_demo.py` | Full 9-scenario showcase (~1,600 lines) |
+| `requirements.txt` | Python dependencies for real CrewAI integration |
 | `policies/content_creation_policy.yaml` | Role-based + PII + injection + delegation policies |
 | `policies/quality_gate_policy.yaml` | Publishing quality gates |
 | `packages/agent-os/src/agent_os/integrations/maf_adapter.py` | Governance middleware |
