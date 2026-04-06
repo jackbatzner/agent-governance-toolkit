@@ -14,7 +14,12 @@ import {
   MCPSlidingRateLimitResult,
   MCPWrappedServerConfig,
 } from './types';
-import { createRegexScanBudget, DEFAULT_MCP_CLOCK } from './mcp-utils';
+import {
+  createRegexScanBudget,
+  debugSecurityFailure,
+  DEFAULT_MCP_CLOCK,
+  validateRegex,
+} from './mcp-utils';
 
 const BUILTIN_DANGEROUS_PATTERNS = [
   /\b\d{3}-\d{2}-\d{4}\b/gi,
@@ -47,6 +52,7 @@ export class MCPGateway {
   private readonly metrics?: MCPGatewayConfig['metrics'];
   private readonly auditSink?: MCPAuditSink;
   private readonly clock: NonNullable<MCPGatewayConfig['clock']>;
+  private readonly logger: MCPGatewayConfig['logger'];
   private readonly scanTimeoutMs: number;
   private readonly rateLimiter?: {
     consume(agentId: string): MCPMaybePromise<MCPSlidingRateLimitResult>;
@@ -65,7 +71,13 @@ export class MCPGateway {
     this.metrics = config.metrics;
     this.auditSink = config.auditSink;
     this.clock = config.clock ?? DEFAULT_MCP_CLOCK;
+    this.logger = config.logger;
     this.scanTimeoutMs = config.scanTimeoutMs ?? 100;
+    this.blockedPatterns.forEach((pattern) => {
+      if (pattern instanceof RegExp) {
+        validateRegex(pattern);
+      }
+    });
     this.rateLimiter =
       config.rateLimiter
       ?? (config.rateLimit
@@ -80,7 +92,8 @@ export class MCPGateway {
   ): Promise<MCPGatewayDecisionResult> {
     try {
       return await this.evaluate(agentId, toolName, params);
-    } catch {
+    } catch (error) {
+      debugSecurityFailure(this.logger, 'gateway.evaluateToolCall', error);
       return this.finalize(
         agentId,
         toolName,

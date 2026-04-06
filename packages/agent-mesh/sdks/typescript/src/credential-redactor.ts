@@ -7,7 +7,7 @@ import {
   CredentialRedactorConfig,
   MCPRedaction,
 } from './types';
-import { isRecord, truncatePreview } from './mcp-utils';
+import { isRecord, truncatePreview, validateRegex } from './mcp-utils';
 
 const DEFAULT_REPLACEMENT = '[REDACTED]';
 const SENSITIVE_KEY_PATTERN = /(password|passwd|pwd|secret|token|api[_-]?key|connection.?string|accountkey|sharedaccesssignature|sas)/i;
@@ -145,12 +145,17 @@ export class CredentialRedactor {
 }
 
 function toGlobalPattern(pattern: RegExp | string): RegExp {
+  const compiled = pattern instanceof RegExp
+    ? new RegExp(
+      pattern.source,
+      pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`,
+    )
+    : new RegExp(pattern, 'g');
+  validateRegex(compiled);
+
   if (pattern instanceof RegExp) {
-    const flags = pattern.flags.includes('g')
-      ? pattern.flags
-      : `${pattern.flags}g`;
-    return new RegExp(pattern.source, flags);
+    return compiled;
   }
 
-  return new RegExp(pattern, 'g');
+  return compiled;
 }

@@ -7,7 +7,7 @@ import {
   MCPSlidingRateLimitConfig,
   MCPSlidingRateLimitResult,
 } from './types';
-import { DEFAULT_MCP_CLOCK, toTimestamp } from './mcp-utils';
+import { debugSecurityFailure, DEFAULT_MCP_CLOCK, toTimestamp } from './mcp-utils';
 
 export class InMemoryMCPRateLimitStore {
   private readonly buckets = new Map<string, number[]>();
@@ -33,6 +33,7 @@ export class MCPSlidingRateLimiter {
   private readonly maxRequests: number;
   private readonly windowMs: number;
   private readonly clock: MCPClock;
+  private readonly logger: MCPSlidingRateLimitConfig['logger'];
   private readonly store: {
     get(agentId: string): MCPMaybePromise<number[]>;
     set(agentId: string, hits: number[]): MCPMaybePromise<void>;
@@ -43,6 +44,7 @@ export class MCPSlidingRateLimiter {
     this.maxRequests = config.maxRequests;
     this.windowMs = config.windowMs;
     this.clock = config.clock ?? DEFAULT_MCP_CLOCK;
+    this.logger = config.logger;
     this.store = new InMemoryMCPRateLimitStore();
   }
 
@@ -65,7 +67,8 @@ export class MCPSlidingRateLimiter {
         resetAt,
         retryAfterMs: allowed ? 0 : Math.max(resetAt - now, 0),
       };
-    } catch {
+    } catch (error) {
+      debugSecurityFailure(this.logger, 'slidingRateLimiter.consume', error);
       return {
         allowed: false,
         count: 0,
