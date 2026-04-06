@@ -33,4 +33,32 @@ describe('MCPResponseScanner', () => {
     expect(result.blocked).toBe(false);
     expect(result.sanitized).toEqual({ message: 'Search results for weather today' });
   });
+
+  it('fails closed when regex scanning exceeds the time budget', () => {
+    const scanner = new MCPResponseScanner({
+      clock: {
+        now: () => 0,
+        monotonic: (() => {
+          let tick = 0;
+          return () => {
+            tick += 200;
+            return tick;
+          };
+        })(),
+      },
+      scanTimeoutMs: 100,
+    });
+
+    const result = scanner.scan({ message: 'harmless text' });
+
+    expect(result.blocked).toBe(true);
+    expect(result.safe).toBe(false);
+    expect(result.findings).toEqual([{
+      type: 'instruction_injection',
+      severity: 'critical',
+      message: 'Internal error - output blocked (fail-closed)',
+      matchedText: 'scan_error',
+      path: '$',
+    }]);
+  });
 });

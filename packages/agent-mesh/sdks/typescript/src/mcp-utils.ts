@@ -6,10 +6,14 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'crypto';
+import { performance } from 'perf_hooks';
 import { MCPClock } from './types';
+
+const DEFAULT_REGEX_SCAN_TIMEOUT_MS = 100;
 
 export const DEFAULT_MCP_CLOCK: MCPClock = {
   now: () => Date.now(),
+  monotonic: () => performance.now(),
 };
 
 export function toTimestamp(value: number | Date): number {
@@ -20,6 +24,36 @@ export function normalizeSecret(secret: string | Uint8Array): Buffer {
   return typeof secret === 'string'
     ? Buffer.from(secret, 'utf-8')
     : Buffer.from(secret);
+}
+
+export class RegexScanBudget {
+  private readonly startedAt: number;
+
+  constructor(
+    private readonly clock: MCPClock = DEFAULT_MCP_CLOCK,
+    private readonly timeoutMs: number = DEFAULT_REGEX_SCAN_TIMEOUT_MS,
+  ) {
+    this.startedAt = this.monotonicNow();
+  }
+
+  checkpoint(
+    publicMessage: string = 'Regex scan exceeded time budget - access denied',
+  ): void {
+    if (this.monotonicNow() - this.startedAt >= this.timeoutMs) {
+      throw new Error(publicMessage);
+    }
+  }
+
+  private monotonicNow(): number {
+    return this.clock.monotonic?.() ?? performance.now();
+  }
+}
+
+export function createRegexScanBudget(
+  clock?: MCPClock,
+  timeoutMs?: number,
+): RegexScanBudget {
+  return new RegexScanBudget(clock ?? DEFAULT_MCP_CLOCK, timeoutMs ?? DEFAULT_REGEX_SCAN_TIMEOUT_MS);
 }
 
 export function randomNonce(size: number = 18): string {

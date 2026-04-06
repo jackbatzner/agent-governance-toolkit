@@ -214,6 +214,8 @@ export interface MCPResponseScannerConfig {
   blockSeverities?: MCPFindingSeverity[];
   sanitizeText?: boolean;
   suspiciousHosts?: string[];
+  clock?: MCPClock;
+  scanTimeoutMs?: number;
 }
 
 export interface MCPResponseScanResult<T = unknown> {
@@ -452,6 +454,8 @@ export interface MCPGatewayConfig {
   sensitiveTools?: string[];
   blockedPatterns?: Array<string | RegExp>;
   enableBuiltinSanitization?: boolean;
+  clock?: MCPClock;
+  scanTimeoutMs?: number;
   policyEvaluator?: {
     evaluate(action: string, context?: Record<string, unknown>): LegacyPolicyDecision;
   };
@@ -475,6 +479,11 @@ export interface MCPGatewayDecisionResult {
   approvalStatus?: ApprovalStatus;
   policyDecision?: LegacyPolicyDecision;
   rateLimit?: MCPSlidingRateLimitResult;
+}
+
+export interface MCPSecurityScannerConfig {
+  clock?: MCPClock;
+  scanTimeoutMs?: number;
 }
 
 export interface MCPGatewayAuditEntry {

@@ -9,7 +9,11 @@ import {
   MCPResponseScanResult,
   MCPResponseScannerConfig,
 } from './types';
-import { isRecord, truncatePreview } from './mcp-utils';
+import {
+  createRegexScanBudget,
+  isRecord,
+  truncatePreview,
+} from './mcp-utils';
 
 const INJECTION_TAG_PATTERNS = [
   /<\s*(?:system|assistant|instructions?|prompt)[^>]*>/gi,
@@ -35,58 +39,81 @@ export class MCPResponseScanner {
   private readonly blockSeverities: Set<MCPFindingSeverity>;
   private readonly sanitizeText: boolean;
   private readonly redactor: CredentialRedactor;
+  private readonly config: MCPResponseScannerConfig;
 
   constructor(
     config: MCPResponseScannerConfig = {},
     redactorConfig: CredentialRedactorConfig = {},
   ) {
+    this.config = config;
     this.blockSeverities = new Set(config.blockSeverities ?? ['critical']);
     this.sanitizeText = config.sanitizeText ?? true;
     this.redactor = new CredentialRedactor(redactorConfig);
   }
 
   scan<T>(value: T): MCPResponseScanResult<T> {
-    const redactionResult = this.redactor.redact(value);
-    const findings: MCPResponseFinding[] = redactionResult.redactions.map(
-      (redaction) => ({
-        type: 'credential_leak',
+    try {
+      const budget = createRegexScanBudget(this.config.clock, this.config.scanTimeoutMs);
+      const redactionResult = this.redactor.redact(value);
+      const findings: MCPResponseFinding[] = redactionResult.redactions.map(
+        (redaction) => ({
+          type: 'credential_leak',
+          severity: 'critical',
+          message: `Credential-like value detected at ${redaction.path ?? '$'}`,
+          matchedText: redaction.matchedText,
+          path: redaction.path,
+        }),
+      );
+
+      const sanitized = this.scanNode(
+        redactionResult.redacted,
+        '$',
+        findings,
+        budget,
+      ) as T;
+      const blocked = findings.some((finding) =>
+        this.blockSeverities.has(finding.severity),
+      );
+
+      return {
+        safe: findings.length === 0,
+        blocked,
+        findings,
+        original: value,
+        sanitized,
+      };
+    } catch {
+      const findings: MCPResponseFinding[] = [{
+        type: 'instruction_injection',
         severity: 'critical',
-        message: `Credential-like value detected at ${redaction.path ?? '$'}`,
-        matchedText: redaction.matchedText,
-        path: redaction.path,
-      }),
-    );
+        message: 'Internal error - output blocked (fail-closed)',
+        matchedText: 'scan_error',
+        path: '$',
+      }];
 
-    const sanitized = this.scanNode(
-      redactionResult.redacted,
-      '$',
-      findings,
-    ) as T;
-    const blocked = findings.some((finding) =>
-      this.blockSeverities.has(finding.severity),
-    );
-
-    return {
-      safe: findings.length === 0,
-      blocked,
-      findings,
-      original: value,
-      sanitized,
-    };
+      return {
+        safe: false,
+        blocked: true,
+        findings,
+        original: value,
+        sanitized: value,
+      };
+    }
   }
 
   private scanNode(
     value: unknown,
     path: string,
     findings: MCPResponseFinding[],
+    budget: ReturnType<typeof createRegexScanBudget>,
   ): unknown {
     if (typeof value === 'string') {
-      return this.scanString(value, path, findings);
+      return this.scanString(value, path, findings, budget);
     }
 
     if (Array.isArray(value)) {
       return value.map((item, index) =>
-        this.scanNode(item, `${path}[${index}]`, findings),
+        this.scanNode(item, `${path}[${index}]`, findings, budget),
       );
     }
 
@@ -96,7 +123,7 @@ export class MCPResponseScanner {
 
     const clone: Record<string, unknown> = {};
     for (const [key, current] of Object.entries(value)) {
-      clone[key] = this.scanNode(current, `${path}.${key}`, findings);
+      clone[key] = this.scanNode(current, `${path}.${key}`, findings, budget);
     }
     return clone;
   }
@@ -105,6 +132,7 @@ export class MCPResponseScanner {
     value: string,
     path: string,
     findings: MCPResponseFinding[],
+    budget: ReturnType<typeof createRegexScanBudget>,
   ): string {
     let sanitized = value;
 
@@ -136,6 +164,7 @@ export class MCPResponseScanner {
 
     for (const detector of detectors) {
       for (const pattern of detector.patterns) {
+        budget.checkpoint('Regex scan exceeded time budget - output blocked');
         pattern.lastIndex = 0;
         const matches = [...sanitized.matchAll(pattern)];
         if (matches.length === 0) {

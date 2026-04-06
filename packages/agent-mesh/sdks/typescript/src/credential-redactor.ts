@@ -21,6 +21,10 @@ const BUILTIN_PATTERNS: CredentialPatternDefinition[] = [
     name: 'connection_string',
     pattern: /\b(?:AccountKey|SharedAccessKey|Password|Pwd|Secret|ApiKey)\s*=\s*[^;,\s]+/gi,
   },
+  {
+    name: 'pem_block',
+    pattern: /-----BEGIN [A-Z0-9 ]+-----[\s\S]*?-----END [A-Z0-9 ]+-----/g,
+  },
 ];
 
 interface CompiledPattern {

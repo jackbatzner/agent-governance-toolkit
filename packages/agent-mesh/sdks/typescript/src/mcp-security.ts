@@ -5,12 +5,14 @@ import { createHash } from 'crypto';
 import {
   MCPScanAuditRecord,
   MCPScanResult,
+  MCPSecurityScannerConfig,
   MCPSeverity,
   MCPThreat,
   MCPThreatType,
   MCPToolDefinition,
   ToolFingerprint,
 } from './types';
+import { createRegexScanBudget, DEFAULT_MCP_CLOCK } from './mcp-utils';
 
 const INVISIBLE_UNICODE_PATTERNS = [
   /[\u200b\u200c\u200d\ufeff]/g,
@@ -82,6 +84,14 @@ const SUSPICIOUS_DECODED_KEYWORDS = [
 export class MCPSecurityScanner {
   private readonly toolRegistry = new Map<string, ToolFingerprint>();
   private readonly auditRecords: MCPScanAuditRecord[] = [];
+  private readonly config: Required<Pick<MCPSecurityScannerConfig, 'clock' | 'scanTimeoutMs'>>;
+
+  constructor(config: MCPSecurityScannerConfig = {}) {
+    this.config = {
+      clock: config.clock ?? DEFAULT_MCP_CLOCK,
+      scanTimeoutMs: config.scanTimeoutMs ?? 100,
+    };
+  }
 
   scanTool(
     toolName: string,
@@ -89,21 +99,32 @@ export class MCPSecurityScanner {
     schema?: Record<string, unknown>,
     serverName: string = 'unknown',
   ): MCPThreat[] {
-    const threats: MCPThreat[] = [];
-    threats.push(...this.checkHiddenInstructions(description, toolName, serverName));
-    threats.push(...this.checkDescriptionInjection(description, toolName, serverName));
-    if (schema) {
-      threats.push(...this.checkSchemaAbuse(schema, toolName, serverName));
-    }
-    threats.push(...this.checkCrossServer(toolName, serverName));
+    const budget = createRegexScanBudget(this.config.clock, this.config.scanTimeoutMs);
+    try {
+      const threats: MCPThreat[] = [];
+      threats.push(...this.checkHiddenInstructions(description, toolName, serverName, budget));
+      threats.push(...this.checkDescriptionInjection(description, toolName, serverName, budget));
+      if (schema) {
+        threats.push(...this.checkSchemaAbuse(schema, toolName, serverName, budget));
+      }
+      threats.push(...this.checkCrossServer(toolName, serverName));
 
-    const rugPull = this.checkRugPull(toolName, description, schema, serverName);
-    if (rugPull) {
-      threats.push(rugPull);
-    }
+      const rugPull = this.checkRugPull(toolName, description, schema, serverName);
+      if (rugPull) {
+        threats.push(rugPull);
+      }
 
-    this.recordAudit('scan_tool', toolName, serverName, threats);
-    return threats;
+      this.recordAudit('scan_tool', toolName, serverName, threats);
+      return threats;
+    } catch {
+      return [{
+        threatType: MCPThreatType.ToolPoisoning,
+        severity: MCPSeverity.Critical,
+        toolName,
+        serverName,
+        message: 'Scan error - tool rejected (fail-closed)',
+      }];
+    }
   }
 
   scanServer(serverName: string, tools: MCPToolDefinition[]): MCPScanResult {
@@ -215,10 +236,12 @@ export class MCPSecurityScanner {
     description: string,
     toolName: string,
     serverName: string,
+    budget: ReturnType<typeof createRegexScanBudget>,
   ): MCPThreat[] {
     const threats: MCPThreat[] = [];
 
     for (const pattern of INVISIBLE_UNICODE_PATTERNS) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       const match = description.match(pattern);
       if (match) {
         threats.push({
@@ -237,6 +260,7 @@ export class MCPSecurityScanner {
     }
 
     for (const pattern of HIDDEN_COMMENT_PATTERNS) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       const match = description.match(pattern);
       if (match) {
         threats.push({
@@ -254,12 +278,14 @@ export class MCPSecurityScanner {
     }
 
     for (const pattern of ENCODED_PAYLOAD_PATTERNS) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       const match = description.match(pattern);
       if (!match) {
         continue;
       }
 
       const suspicious = match.some((candidate) => {
+        budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
         if (candidate.startsWith('\\x')) {
           return true;
         }
@@ -283,6 +309,7 @@ export class MCPSecurityScanner {
       }
     }
 
+    budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
     if (hasMatch(EXCESSIVE_WHITESPACE_PATTERN, description)) {
       threats.push({
         threatType: MCPThreatType.HiddenInstruction,
@@ -295,6 +322,7 @@ export class MCPSecurityScanner {
     }
 
     for (const pattern of HIDDEN_INSTRUCTION_PATTERNS) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       if (hasMatch(pattern, description)) {
         threats.push({
           threatType: MCPThreatType.HiddenInstruction,
@@ -314,10 +342,12 @@ export class MCPSecurityScanner {
     description: string,
     toolName: string,
     serverName: string,
+    budget: ReturnType<typeof createRegexScanBudget>,
   ): MCPThreat[] {
     const threats: MCPThreat[] = [];
 
     for (const pattern of HIDDEN_INSTRUCTION_PATTERNS) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       if (hasMatch(pattern, description)) {
         threats.push({
           threatType: MCPThreatType.DescriptionInjection,
@@ -331,6 +361,7 @@ export class MCPSecurityScanner {
     }
 
     for (const pattern of ROLE_OVERRIDE_PATTERNS) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       if (hasMatch(pattern, description)) {
         threats.push({
           threatType: MCPThreatType.DescriptionInjection,
@@ -344,6 +375,7 @@ export class MCPSecurityScanner {
     }
 
     for (const pattern of EXFILTRATION_PATTERNS) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       if (hasMatch(pattern, description)) {
         threats.push({
           threatType: MCPThreatType.DescriptionInjection,
@@ -363,6 +395,7 @@ export class MCPSecurityScanner {
     schema: Record<string, unknown>,
     toolName: string,
     serverName: string,
+    budget: ReturnType<typeof createRegexScanBudget>,
   ): MCPThreat[] {
     const threats: MCPThreat[] = [];
 
@@ -395,6 +428,7 @@ export class MCPSecurityScanner {
     ];
 
     for (const [propName, propDef] of Object.entries(properties)) {
+      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
       if (
         required.includes(propName)
         && suspiciousNames.some((name) => propName.toLowerCase().includes(name))
@@ -411,6 +445,7 @@ export class MCPSecurityScanner {
 
       if (typeof propDef.default === 'string' && propDef.default.length > 10) {
         for (const pattern of HIDDEN_INSTRUCTION_PATTERNS) {
+          budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
           if (hasMatch(pattern, propDef.default)) {
             threats.push({
               threatType: MCPThreatType.ToolPoisoning,
@@ -428,6 +463,7 @@ export class MCPSecurityScanner {
 
       if (typeof propDef.description === 'string') {
         for (const pattern of HIDDEN_INSTRUCTION_PATTERNS) {
+          budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
           if (hasMatch(pattern, propDef.description)) {
             threats.push({
               threatType: MCPThreatType.ToolPoisoning,

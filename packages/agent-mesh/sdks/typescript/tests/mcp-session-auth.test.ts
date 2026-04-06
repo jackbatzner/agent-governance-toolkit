@@ -3,10 +3,12 @@
 
 import { MCPSessionAuthenticator } from '../src';
 
+const SHARED_SECRET = '0123456789abcdef0123456789abcdef';
+
 describe('MCPSessionAuthenticator', () => {
   it('issues and verifies session tokens bound to an agent', async () => {
     const auth = new MCPSessionAuthenticator({
-      secret: 'super-secret',
+      secret: SHARED_SECRET,
     });
 
     const issued = await auth.issueToken('agent-1');
@@ -23,7 +25,7 @@ describe('MCPSessionAuthenticator', () => {
       monotonic: () => now,
     };
     const auth = new MCPSessionAuthenticator({
-      secret: 'super-secret',
+      secret: SHARED_SECRET,
       ttlMs: 100,
       maxClockSkewMs: 0,
       clock,
@@ -39,7 +41,7 @@ describe('MCPSessionAuthenticator', () => {
 
   it('enforces concurrent session limits', async () => {
     const auth = new MCPSessionAuthenticator({
-      secret: 'super-secret',
+      secret: SHARED_SECRET,
       maxConcurrentSessions: 1,
     });
 
@@ -51,7 +53,7 @@ describe('MCPSessionAuthenticator', () => {
 
   it('invalidates revoked sessions', async () => {
     const auth = new MCPSessionAuthenticator({
-      secret: 'super-secret',
+      secret: SHARED_SECRET,
     });
 
     const issued = await auth.issueToken('agent-1');
@@ -60,5 +62,11 @@ describe('MCPSessionAuthenticator', () => {
     const verification = await auth.verifyToken(issued.token, 'agent-1');
     expect(verification.valid).toBe(false);
     expect(verification.reason).toContain('Session not found');
+  });
+
+  it('rejects undersized HMAC secrets', () => {
+    expect(() => new MCPSessionAuthenticator({
+      secret: 'too-short',
+    })).toThrow('HMAC secret must be at least 32 bytes');
   });
 });
