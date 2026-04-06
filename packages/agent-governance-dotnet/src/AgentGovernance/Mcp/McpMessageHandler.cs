@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT License.
 
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
@@ -31,8 +32,8 @@ public sealed class McpMessageHandler
     private readonly McpGateway _gateway;
     private readonly McpToolMapper _toolMapper;
     private readonly string _agentId;
-    private readonly Dictionary<string, Dictionary<string, object>> _registeredTools = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, Dictionary<string, object>> _registeredResources = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, object>> _registeredTools = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, object>> _registeredResources = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Optional delegate invoked when a tool call or resource read is blocked by governance.
@@ -72,7 +73,7 @@ public sealed class McpMessageHandler
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
         ArgumentNullException.ThrowIfNull(toolInfo);
-        _registeredTools[toolName] = toolInfo;
+        _registeredTools[toolName] = ToConcurrentDictionary(toolInfo);
     }
 
     /// <summary>
@@ -84,7 +85,7 @@ public sealed class McpMessageHandler
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(uriPattern);
         ArgumentNullException.ThrowIfNull(resourceInfo);
-        _registeredResources[uriPattern] = resourceInfo;
+        _registeredResources[uriPattern] = ToConcurrentDictionary(resourceInfo);
     }
 
     /// <summary>
@@ -158,7 +159,7 @@ public sealed class McpMessageHandler
                 var (allowed, _) = _gateway.InterceptToolCall(_agentId, toolName, new Dictionary<string, object>());
                 if (allowed)
                 {
-                    allowedTools.Add(toolInfo);
+                    allowedTools.Add(ToDictionary(toolInfo));
                 }
             }
         }
@@ -224,7 +225,7 @@ public sealed class McpMessageHandler
             var (allowed, _) = _gateway.InterceptToolCall(_agentId, $"resource:{uri}", new Dictionary<string, object>());
             if (allowed)
             {
-                allowedResources.Add(resourceInfo);
+                allowedResources.Add(ToDictionary(resourceInfo));
             }
         }
 
@@ -311,6 +312,18 @@ public sealed class McpMessageHandler
             ["message"] = message
         }
     };
+
+    private static ConcurrentDictionary<string, object> ToConcurrentDictionary(
+        IEnumerable<KeyValuePair<string, object>> values)
+    {
+        return new ConcurrentDictionary<string, object>(values, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static Dictionary<string, object> ToDictionary(
+        IEnumerable<KeyValuePair<string, object>> values)
+    {
+        return values.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
+    }
 
     private static Dictionary<string, object> ExtractParams(Dictionary<string, object?> message)
     {

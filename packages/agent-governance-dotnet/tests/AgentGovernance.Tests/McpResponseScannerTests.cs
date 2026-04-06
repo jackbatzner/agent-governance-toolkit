@@ -273,6 +273,10 @@ public class McpResponseScannerTests
     [Theory]
     [InlineData("-----BEGIN PRIVATE KEY-----")]
     [InlineData("-----BEGIN RSA PRIVATE KEY-----")]
+    [InlineData("-----BEGIN EC PRIVATE KEY-----")]
+    [InlineData("-----BEGIN DSA PRIVATE KEY-----")]
+    [InlineData("-----BEGIN OPENSSH PRIVATE KEY-----")]
+    [InlineData("-----BEGIN ENCRYPTED PRIVATE KEY-----")]
     public void ScanResponse_PrivateKeyVariants_DetectsCredential(string keyHeader)
     {
         var result = _scanner.ScanResponse($"Found key:\n{keyHeader}\nMIIE...", "pem_tool");

@@ -84,17 +84,16 @@ public sealed class ToolFingerprintRegistry
             {
                 var changed = !string.Equals(existing.DescriptionHash, descHash, StringComparison.Ordinal)
                            || !string.Equals(existing.SchemaHash, schemaHash, StringComparison.Ordinal);
-
-                existing.LastSeen = now;
-
-                if (changed)
+                return new ToolFingerprint
                 {
-                    existing.DescriptionHash = descHash;
-                    existing.SchemaHash = schemaHash;
-                    existing.Version++;
-                }
-
-                return existing;
+                    ToolName = existing.ToolName,
+                    ServerName = existing.ServerName,
+                    DescriptionHash = descHash,
+                    SchemaHash = schemaHash,
+                    FirstSeen = existing.FirstSeen,
+                    LastSeen = now,
+                    Version = changed ? existing.Version + 1 : existing.Version
+                };
             });
     }
 

@@ -35,9 +35,11 @@ public class ToolFingerprintTests
     [Fact]
     public void Register_ChangedDescription_IncrementsVersion()
     {
-        _registry.Register("tool", "original description", null, "srv");
+        var original = _registry.Register("tool", "original description", null, "srv");
         var fp = _registry.Register("tool", "changed description", null, "srv");
 
+        Assert.NotSame(original, fp);
+        Assert.Equal(1, original.Version);
         Assert.Equal(2, fp.Version);
     }
 
@@ -47,9 +49,11 @@ public class ToolFingerprintTests
         var schema1 = new Dictionary<string, object> { ["type"] = "string" };
         var schema2 = new Dictionary<string, object> { ["type"] = "integer" };
 
-        _registry.Register("tool", "desc", schema1, "srv");
+        var original = _registry.Register("tool", "desc", schema1, "srv");
         var fp = _registry.Register("tool", "desc", schema2, "srv");
 
+        Assert.NotSame(original, fp);
+        Assert.Equal(1, original.Version);
         Assert.Equal(2, fp.Version);
     }
 
