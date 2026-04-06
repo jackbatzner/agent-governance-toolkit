@@ -34,7 +34,8 @@
     "backdoors",
     "metacharacters",
     "metacharacter",
-    "Blocklist"
+    "Blocklist",
+    "appsettings"
   ],
   "ignorePaths": [
     "**/node_modules/**",
