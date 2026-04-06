@@ -110,7 +110,7 @@ Still have questions? File a [GitHub issue](https://github.com/microsoft/agent-g
 - **Agent SRE**: SLOs, error budgets, replay debugging, chaos engineering, circuit breakers, progressive delivery
   - [Agent SRE](packages/agent-sre/) | [Observability integrations](packages/agent-hypervisor/src/hypervisor/observability/)
 - **MCP Security Scanner**: Detect tool poisoning, typosquatting, hidden instructions, and rug-pull attacks in MCP tool definitions
-  - [MCP Scanner](packages/agent-os/src/agentos/mcp_security.py) | [CLI](packages/agent-os/src/agentos/cli/mcp_scan.py)
+  - [MCP Scanner](packages/agent-os/src/agent_os/mcp_security.py) | [CLI](packages/agent-os/src/agent_os/cli/mcp_scan.py)
 - **Trust Report CLI**: `agentmesh trust report` — visualize trust scores, task success/failure, and agent activity
   - [Trust CLI](packages/agent-mesh/src/agentmesh/cli/trust_cli.py)
 - **Secret Scanning & Fuzzing**: Gitleaks workflow, 7 fuzz targets covering policy, injection, sandbox, trust, and MCP
