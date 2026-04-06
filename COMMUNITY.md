@@ -15,6 +15,7 @@ Community-written content about agent governance, security, and the toolkit.
 | [Why AI Agent Governance Matters in 2026](https://dev.to/kanishtyagii/why-ai-agent-governance-matters-in-2026-4mnk) | [@kanish5](https://github.com/kanish5) | Dev.to |
 | [Policy-as-Code vs Prompt Engineering — When Guardrails Need Governance](https://dev.to/kanishtyagii/policy-as-code-vs-prompt-engineering-when-guardrails-need-governance-23pi) | [@kanish5](https://github.com/kanish5) | Dev.to |
 | [Decentralized Identity in Multi-Agent Systems — From Theory to Production](https://dev.to/moltycel/decentralized-identity-in-multi-agent-systems-from-theory-to-production-1oe3) | [@MoltyCel](https://github.com/MoltyCel) | Dev.to |
+| [MCP Security — Why Your AI Agent's Tool Calls Need a Firewall](docs/blog/05-mcp-security.md) | [@jackbatzner](https://github.com/jackbatzner) | Blog |
 
 ---
 
