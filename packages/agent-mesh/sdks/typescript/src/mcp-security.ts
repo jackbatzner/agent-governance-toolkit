@@ -26,12 +26,6 @@ const INVISIBLE_UNICODE_PATTERNS = [
   /[\u2060\u180e]/g,
 ];
 
-const HIDDEN_COMMENT_PATTERNS = [
-  /<!--[^-]*(?:-(?!->)[^-]*)*-->/gs,
-  /\[\/\/\]:#\([^)]*\)/g,
-  /\[comment\]:<>\([^)]*\)/g,
-];
-
 const HIDDEN_INSTRUCTION_PATTERNS = [
   /ignore\s+(?:all\s+)?previous/gi,
   /override\s+(?:the\s+)?(?:previous|above|original)/gi,
@@ -265,22 +259,20 @@ export class MCPSecurityScanner {
       }
     }
 
-    for (const pattern of HIDDEN_COMMENT_PATTERNS) {
-      budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
-      const match = description.match(pattern);
-      if (match) {
-        threats.push({
-          threatType: MCPThreatType.HiddenInstruction,
-          severity: MCPSeverity.Critical,
-          toolName,
-          serverName,
-          message: 'Hidden comment detected in tool description',
-          matchedPattern: pattern.source,
-          details: {
-            commentPreview: match[0].slice(0, 80),
-          },
-        });
-      }
+    budget.checkpoint('Regex scan exceeded time budget - tool rejected (fail-closed)');
+    const hiddenComment = findHiddenComment(description);
+    if (hiddenComment) {
+      threats.push({
+        threatType: MCPThreatType.HiddenInstruction,
+        severity: MCPSeverity.Critical,
+        toolName,
+        serverName,
+        message: 'Hidden comment detected in tool description',
+        matchedPattern: 'hidden_comment',
+        details: {
+          commentPreview: hiddenComment.slice(0, 80),
+        },
+      });
     }
 
     for (const pattern of ENCODED_PAYLOAD_PATTERNS) {
@@ -591,4 +583,28 @@ function levenshtein(left: string, right: string): number {
 function hasMatch(pattern: RegExp, value: string): boolean {
   pattern.lastIndex = 0;
   return pattern.test(value);
+}
+
+function findHiddenComment(value: string): string | undefined {
+  return findDelimitedMarker(value, '<!--', '-->')
+    ?? findDelimitedMarker(value, '[//]:#(', ')')
+    ?? findDelimitedMarker(value, '[comment]:<>(', ')');
+}
+
+function findDelimitedMarker(
+  value: string,
+  startMarker: string,
+  endMarker: string,
+): string | undefined {
+  const startIndex = value.indexOf(startMarker);
+  if (startIndex === -1) {
+    return undefined;
+  }
+
+  const endIndex = value.indexOf(endMarker, startIndex + startMarker.length);
+  if (endIndex === -1) {
+    return undefined;
+  }
+
+  return value.slice(startIndex, endIndex + endMarker.length);
 }

@@ -176,5 +176,47 @@ function canonicalize(
 }
 
 function hasNestedQuantifier(source: string): boolean {
-  return /\((?:[^()\\]|\\.)*[+*{][^()]*\)[+*{?]/.test(source);
+  const groupStack: boolean[] = [];
+  let escaped = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '(') {
+      groupStack.push(false);
+      continue;
+    }
+    if (char === ')') {
+      const groupHasInnerQuantifier = groupStack.pop();
+      if (!groupHasInnerQuantifier) {
+        continue;
+      }
+
+      if (startsQuantifier(source, index + 1)) {
+        return true;
+      }
+      if (groupStack.length > 0) {
+        groupStack[groupStack.length - 1] = true;
+      }
+      continue;
+    }
+    if (groupStack.length > 0 && startsQuantifier(source, index)) {
+      groupStack[groupStack.length - 1] = true;
+    }
+  }
+
+  return false;
+}
+
+function startsQuantifier(source: string, index: number): boolean {
+  const char = source[index];
+  return char === '*' || char === '+' || char === '?' || char === '{';
 }

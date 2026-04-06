@@ -25,7 +25,6 @@ const BUILTIN_DANGEROUS_PATTERNS = [
   /\b\d{3}-\d{2}-\d{4}\b/gi,
   /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/gi,
   /;\s*(?:rm|del|format|mkfs)\b/gi,
-  /\$\([^)]*\)/g,
   /`[^`]+`/g,
 ];
 
@@ -310,6 +309,16 @@ export class MCPGateway {
     }
 
     if (this.enableBuiltinSanitization) {
+      if (hasShellExpansion(serialized)) {
+        return {
+          type: 'imperative_language',
+          severity: 'critical',
+          message: 'Parameters matched dangerous pattern: shell_expansion',
+          matchedText: 'shell_expansion',
+          path: '$',
+        };
+      }
+
       for (const pattern of BUILTIN_DANGEROUS_PATTERNS) {
         budget.checkpoint('Regex scan exceeded time budget - access denied');
         if (pattern.test(serialized)) {
@@ -326,4 +335,9 @@ export class MCPGateway {
 
     return undefined;
   }
+}
+
+function hasShellExpansion(value: string): boolean {
+  const startIndex = value.indexOf('$(');
+  return startIndex !== -1 && value.indexOf(')', startIndex + 2) !== -1;
 }
