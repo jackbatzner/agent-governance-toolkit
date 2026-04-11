@@ -19,6 +19,7 @@ Community-written content about agent governance, security, and the toolkit.
 | [Agent SRE — SLOs, Error Budgets, and Circuit Breakers for AI Agents](https://dev.to/kanishtyagii/agent-sre-slos-error-budgets-and-circuit-breakers-for-ai-agents-1d1d) | [@kanish5](https://github.com/kanish5) | Dev.to |
 | [Decentralized Identity in Multi-Agent Systems — From Theory to Production](https://dev.to/moltycel/decentralized-identity-in-multi-agent-systems-from-theory-to-production-1oe3) | [@MoltyCel](https://github.com/MoltyCel) | Dev.to |
 | [OWASP Agentic Top 10 — What Every AI Developer Should Know in 2026](https://dev.to/zhangzeyu/owasp-agentic-top-10-what-every-ai-developer-should-know-in-2026-55hi) | [@lawcontinue](https://github.com/lawcontinue) | Dev.to |
+| [EU AI Act for AI Agent Developers: A Practical Compliance Checklist](https://eu-ai-act.ai-mvp.com/2026/04/10/eu-ai-act-compliance-checklist-for-ai-agent-developers/) | [@carloshvp](https://github.com/carloshvp) | ai-mvp.com |
 
 ---
 
@@ -49,3 +50,4 @@ We welcome contributions of all kinds — code, documentation, bug reports, and 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact
 [opencode@microsoft.com](mailto:opencode@microsoft.com) with any questions.
+
