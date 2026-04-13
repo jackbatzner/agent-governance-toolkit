@@ -142,6 +142,8 @@ Agent OS + ecosystem covers **10 out of 10** [OWASP Agentic Application Security
 - `CredentialRedactor` removes common secrets from strings and nested payloads before they reach logs or audit trails.
 - `MCPSlidingRateLimiter` adds a dedicated per-agent sliding-window limiter for MCP traffic, alongside the existing token-bucket limiter in `integrations/rate_limiter.py`.
 - OpenTelemetry counters: `mcp_decisions`, `mcp_threats_detected`, `mcp_rate_limit_hits`, and `mcp_scans`.
+- Treat MCP session tokens and signing keys as secrets: do not write raw values to logs, traces, prompts, or persisted audit payloads.
+- Keep the transport fail-closed: if session validation, signature verification, or response scanning fails, deny the MCP action until trust is re-established.
 
 Learn more: [MCP Tools & Security Guide](docs/mcp-tools.md#securing-python-mcp-integrations) · [OWASP mapping](docs/owasp-agentic-top10-mapping.md#asi02--tool-misuse--exploitation)
 
@@ -151,8 +153,10 @@ Learn more: [MCP Tools & Security Guide](docs/mcp-tools.md#securing-python-mcp-i
 from agent_os import (
     CredentialRedactor,
     MCPGateway,
+    MCPMessageSigner,
     MCPResponseScanner,
     MCPSecurityScanner,
+    MCPSessionAuthenticator,
 )
 from agent_os.integrations.base import GovernancePolicy
 
@@ -165,6 +169,8 @@ policy = GovernancePolicy(
 gateway = MCPGateway(policy, sensitive_tools=["write_repo"])
 metadata_scanner = MCPSecurityScanner()
 response_scanner = MCPResponseScanner()
+session_auth = MCPSessionAuthenticator()
+signer = MCPMessageSigner(MCPMessageSigner.generate_key())
 
 tool_name = "search_docs"
 description = "Search internal product docs."
@@ -181,18 +187,31 @@ if threats:
 metadata_scanner.register_tool(tool_name, description, schema, server_name="docs-server")
 
 # 2. Gate every call before invoking the underlying MCP transport.
+token = session_auth.create_session(agent_id="assistant-01", user_id="user-42")
+session = session_auth.validate_session("assistant-01", token)
+if session is None:
+    raise PermissionError("Invalid or expired MCP session token")
+
+envelope = signer.sign_message('{"tool":"search_docs"}', sender_id=session.agent_id)
+verification = signer.verify_message(envelope)
+if not verification.is_valid:
+    raise PermissionError(verification.failure_reason or "Invalid MCP envelope")
+
 allowed, reason = gateway.intercept_tool_call(
-    agent_id="assistant-01",
+    agent_id=session.agent_id,
     tool_name=tool_name,
     params={"query": "MCP hardening checklist"},
 )
 if not allowed:
     raise PermissionError(reason)
 
-# 3. Treat tool output as untrusted before giving it back to the LLM.
+# 3. Treat tool output as untrusted before giving it back to the LLM or logs.
 raw_output = "API key: sk-example-secret"
 scan = response_scanner.scan_response(raw_output, tool_name=tool_name)
-sanitized_output, _ = response_scanner.sanitize_response(raw_output, tool_name=tool_name)
+if not scan.is_safe:
+    sanitized_output, _ = response_scanner.sanitize_response(raw_output, tool_name=tool_name)
+else:
+    sanitized_output = raw_output
 safe_output = CredentialRedactor.redact(sanitized_output)
 assert scan.is_safe is False
 assert safe_output == "API key: [REDACTED]"
