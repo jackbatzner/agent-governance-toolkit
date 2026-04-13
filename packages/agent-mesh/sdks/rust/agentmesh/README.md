@@ -14,7 +14,7 @@ cargo add agentmesh
 
 ```toml
 [dependencies]
-agentmesh = "3.0.2"
+agentmesh = "3.1.0"
 ```
 
 ### Standalone MCP Package
@@ -27,7 +27,7 @@ cargo add agentmesh-mcp
 
 ```toml
 [dependencies]
-agentmesh-mcp = "3.0.2"
+agentmesh-mcp = "3.1.0"
 ```
 
 ## Quick Start
@@ -80,8 +80,18 @@ use agentmesh_mcp::{
 use std::sync::Arc;
 use std::time::Duration;
 
+let signing_secret = std::env::var("MCP_SIGNING_SECRET")
+    .map_err(|_| agentmesh_mcp::McpError::InvalidConfig(
+        "MCP_SIGNING_SECRET must be set",
+    ))?;
+if signing_secret.len() < 32 {
+    return Err(agentmesh_mcp::McpError::InvalidConfig(
+        "MCP_SIGNING_SECRET must be at least 32 bytes",
+    ));
+}
+
 let signer = McpMessageSigner::new(
-    b"top-secret-signing-key".to_vec(),
+    signing_secret.into_bytes(),
     Arc::new(SystemClock),
     Arc::new(SystemNonceGenerator),
     Arc::new(InMemoryNonceStore::default()),
@@ -97,6 +107,9 @@ let result = redactor.redact("Authorization: Bearer super-secret-token");
 assert!(result.sanitized.contains("[REDACTED_BEARER_TOKEN]"));
 # Ok::<(), agentmesh_mcp::McpError>(())
 ```
+
+Use a distinct signing secret per environment and keep it in your normal
+secret-management system; the quick start intentionally avoids hardcoded keys.
 
 ## Documentation
 

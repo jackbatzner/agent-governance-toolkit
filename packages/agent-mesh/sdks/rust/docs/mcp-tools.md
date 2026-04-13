@@ -21,8 +21,10 @@ In the examples below, replace `agentmesh_mcp` imports with `agentmesh::mcp`
 or top-level `agentmesh` re-exports if you are using the full SDK.
 
 For production deployments, keep HMAC and session-token secrets in a managed
-secret store or HSM-backed service and use overlapping rotation windows so
-active sessions and signed messages can expire before you retire the prior key.
+secret store or HSM-backed service, use distinct keys for session issuance and
+message signing, and enforce a minimum key length of at least 32 bytes at
+configuration load time. Use overlapping rotation windows so active sessions
+and signed messages can expire before you retire the prior key.
 
 ## 1. Build the shared MCP security services
 
@@ -219,9 +221,27 @@ use agentmesh_mcp::{
 };
 
 let nonce_generator: Arc<dyn NonceGenerator> = Arc::new(SystemNonceGenerator);
+let session_secret = std::env::var("MCP_SESSION_SECRET")
+    .map_err(|_| agentmesh_mcp::McpError::InvalidConfig(
+        "MCP_SESSION_SECRET must be set",
+    ))?;
+if session_secret.len() < 32 {
+    return Err(agentmesh_mcp::McpError::InvalidConfig(
+        "MCP_SESSION_SECRET must be at least 32 bytes",
+    ));
+}
+let message_secret = std::env::var("MCP_MESSAGE_SECRET")
+    .map_err(|_| agentmesh_mcp::McpError::InvalidConfig(
+        "MCP_MESSAGE_SECRET must be set",
+    ))?;
+if message_secret.len() < 32 {
+    return Err(agentmesh_mcp::McpError::InvalidConfig(
+        "MCP_MESSAGE_SECRET must be at least 32 bytes",
+    ));
+}
 
 let session_auth = McpSessionAuthenticator::new(
-    b"session-secret".to_vec(),
+    session_secret.into_bytes(),
     clock.clone(),
     nonce_generator.clone(),
     Arc::new(InMemorySessionStore::default()),
@@ -233,7 +253,7 @@ let issued = session_auth.issue_session("did:mesh:researcher-1")?;
 let session = session_auth.authenticate(&issued.token, "did:mesh:researcher-1")?;
 
 let signer = McpMessageSigner::new(
-    b"message-secret".to_vec(),
+    message_secret.into_bytes(),
     clock.clone(),
     nonce_generator,
     Arc::new(InMemoryNonceStore::default()),
@@ -254,6 +274,12 @@ These primitives provide:
 - atomic concurrent-session enforcement
 - HMAC-signed messages with timestamp windows
 - atomic nonce replay protection
+
+Message signing here proves payload integrity, freshness, and shared-key
+possession between trusted peers. It does **not** replace transport
+confidentiality, certificate validation, or publisher provenance checks, so
+keep TLS or mTLS and your normal peer-identity controls in front of remote MCP
+traffic.
 
 ## 6. Export audit and metrics safely
 

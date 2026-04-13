@@ -16,7 +16,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{env, net::SocketAddr, sync::Arc, time::Duration};
 
 const DEMO_AGENT: &str = "did:mesh:demo-client";
 
@@ -84,16 +84,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         metrics.clone(),
         clock.clone(),
     );
+    let session_secret = load_secret("MCP_SESSION_SECRET")?;
     let session_auth = McpSessionAuthenticator::new(
-        b"demo-session-secret".to_vec(),
+        session_secret,
         clock.clone(),
         nonce_generator.clone(),
         Arc::new(InMemorySessionStore::default()),
         Duration::from_secs(900),
         4,
     )?;
+    let message_secret = load_secret("MCP_MESSAGE_SECRET")?;
     let signer = McpMessageSigner::new(
-        b"demo-message-secret".to_vec(),
+        message_secret,
         clock,
         nonce_generator,
         Arc::new(InMemoryNonceStore::default()),
@@ -128,6 +130,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn load_secret(var_name: &'static str) -> Result<Vec<u8>, McpError> {
+    let value = env::var(var_name).map_err(|_| match var_name {
+        "MCP_SESSION_SECRET" => {
+            McpError::InvalidConfig("MCP_SESSION_SECRET must be set to a 32-byte secret")
+        }
+        "MCP_MESSAGE_SECRET" => {
+            McpError::InvalidConfig("MCP_MESSAGE_SECRET must be set to a 32-byte secret")
+        }
+        _ => McpError::InvalidConfig("required secret must be set"),
+    })?;
+    if value.len() < 32 {
+        return Err(match var_name {
+            "MCP_SESSION_SECRET" => {
+                McpError::InvalidConfig("MCP_SESSION_SECRET must be at least 32 bytes")
+            }
+            "MCP_MESSAGE_SECRET" => {
+                McpError::InvalidConfig("MCP_MESSAGE_SECRET must be at least 32 bytes")
+            }
+            _ => McpError::InvalidConfig("required secret must be at least 32 bytes"),
+        });
+    }
+    Ok(value.into_bytes())
 }
 
 async fn health() -> Json<HealthResponse<'static>> {

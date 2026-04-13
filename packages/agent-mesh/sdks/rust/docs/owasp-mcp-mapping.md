@@ -112,7 +112,8 @@ from nested values before they are logged or re-used.
 
 The SDK provides identity-bound session tokens, TTL expiry, atomic concurrency
 limits, and per-agent rate limiting. TLS, interface binding, certificate
-verification, and secure credential stores remain deployment responsibilities.
+verification, secure credential stores, and enforcing strong HMAC key lengths
+remain deployment responsibilities.
 
 ## 7. Message-Level Integrity and Replay Protection
 
@@ -130,8 +131,10 @@ The signer applies HMAC-SHA256 to the full payload, timestamp, and nonce. Verify
 paths fail closed, reject stale timestamps, and atomically reserve nonces to
 block replay. Store signing secrets and session-token secrets in your existing
 KMS, HSM, or secret-management system rather than in source or static config,
-and rotate keys by issuing a new version before retiring the old one so active
-sessions can be drained safely.
+enforce at least 32-byte secrets at config load time, and rotate keys by
+issuing a new version before retiring the old one so active sessions can be
+drained safely. Message signing here protects integrity and replay resistance;
+you still need TLS or mTLS plus peer-identity validation for transport trust.
 
 ## 8. Multi-Server Isolation & Cross-Origin Protection
 
