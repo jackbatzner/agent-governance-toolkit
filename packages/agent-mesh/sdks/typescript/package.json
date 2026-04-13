@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest --config jest.config.js",
-    "lint": "eslint src/ tests/ --ext .ts",
+    "lint": "eslint src tests",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run build"
   },

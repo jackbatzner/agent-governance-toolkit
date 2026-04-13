@@ -30,6 +30,40 @@ describe('MCPGateway', () => {
     expect(result.reason).toContain('dangerous pattern');
   });
 
+  it('continues blocking built-in dangerous patterns across repeated calls', async () => {
+    const gateway = new MCPGateway();
+
+    const first = await gateway.evaluateToolCall('agent-1', 'search', {
+      command: '`whoami`',
+    });
+    const second = await gateway.evaluateToolCall('agent-1', 'search', {
+      command: '`hostname`',
+    });
+
+    expect(first.allowed).toBe(false);
+    expect(second.allowed).toBe(false);
+    expect(first.reason).toContain('dangerous pattern');
+    expect(second.reason).toContain('dangerous pattern');
+  });
+
+  it('continues blocking custom global regex patterns across repeated calls', async () => {
+    const gateway = new MCPGateway({
+      blockedPatterns: [/secret/gi],
+    });
+
+    const first = await gateway.evaluateToolCall('agent-1', 'search', {
+      text: 'secret token',
+    });
+    const second = await gateway.evaluateToolCall('agent-1', 'search', {
+      text: 'secret value',
+    });
+
+    expect(first.allowed).toBe(false);
+    expect(second.allowed).toBe(false);
+    expect(first.reason).toContain('blocked pattern');
+    expect(second.reason).toContain('blocked pattern');
+  });
+
   it('applies per-agent rate limiting', async () => {
     const gateway = new MCPGateway({
       rateLimiter: new MCPSlidingRateLimiter({

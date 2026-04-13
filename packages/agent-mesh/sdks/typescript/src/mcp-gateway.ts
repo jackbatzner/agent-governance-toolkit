@@ -18,6 +18,7 @@ import {
   createRegexScanBudget,
   debugSecurityFailure,
   DEFAULT_MCP_CLOCK,
+  hasMatch,
   validateRegex,
 } from './mcp-utils';
 
@@ -296,7 +297,7 @@ export class MCPGateway {
       budget.checkpoint('Regex scan exceeded time budget - access denied');
       if (
         (typeof pattern === 'string' && serialized.includes(pattern))
-        || (pattern instanceof RegExp && pattern.test(serialized))
+        || (pattern instanceof RegExp && hasMatch(pattern, serialized))
       ) {
         return {
           type: 'imperative_language',
@@ -321,7 +322,7 @@ export class MCPGateway {
 
       for (const pattern of BUILTIN_DANGEROUS_PATTERNS) {
         budget.checkpoint('Regex scan exceeded time budget - access denied');
-        if (pattern.test(serialized)) {
+        if (hasMatch(pattern, serialized)) {
           return {
             type: 'imperative_language',
             severity: 'critical',

@@ -123,6 +123,11 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+export function hasMatch(pattern: RegExp, value: string): boolean {
+  pattern.lastIndex = 0;
+  return pattern.test(value);
+}
+
 export function truncatePreview(value: string, max: number = 120): string {
   return value.length <= max ? value : `${value.slice(0, max)}...`;
 }
