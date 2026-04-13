@@ -5,10 +5,10 @@ Licensed under the MIT License.
 
 # OWASP Agentic Top 10 (2026) — Reference Architecture for Agent Governance Toolkit
 
-**Mapping Version:** 1.0  
-**Toolkit Version:** v3.0.0  
-**OWASP Reference:** [OWASP Agentic Security Initiative Top 10](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)  
-**Assessment Basis:** repository code in this checkout only  
+**Mapping Version:** 1.0
+**Toolkit Version:** v3.0.0
+**OWASP Reference:** [OWASP Agentic Security Initiative Top 10](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)
+**Assessment Basis:** repository code in this checkout only
 **Last Updated:** April 2026
 
 > **Scope note:** This document maps the 2026 **ASI01–ASI10** risks to concrete AGT implementation patterns that exist in code today. Where a package still exposes LLM Top 10 `ATxx` identifiers rather than Agentic `ASIxx` IDs, the mapping below translates the implementation by behavioral overlap rather than by symbol name (`packages\agentmesh-integrations\copilot-governance\src\owasp.ts:21-65`).
