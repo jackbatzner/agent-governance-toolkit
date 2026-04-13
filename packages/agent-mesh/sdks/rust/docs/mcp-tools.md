@@ -20,6 +20,10 @@ cargo add agentmesh-mcp
 In the examples below, replace `agentmesh_mcp` imports with `agentmesh::mcp`
 or top-level `agentmesh` re-exports if you are using the full SDK.
 
+For production deployments, keep HMAC and session-token secrets in a managed
+secret store or HSM-backed service and use overlapping rotation windows so
+active sessions and signed messages can expire before you retire the prior key.
+
 ## 1. Build the shared MCP security services
 
 ```rust
@@ -161,6 +165,10 @@ The gateway pipeline is fixed and fail-closed:
 3. payload sanitization via `McpResponseScanner`
 4. rate limiting via `McpSlidingRateLimiter`
 5. human approval via `approval_required_tools`
+
+The gateway does not sandbox the process running your MCP server. Pair it with
+host controls such as containers or VMs, non-root execution, loopback-only
+bindings, read-only filesystems where practical, and outbound egress allowlists.
 
 ## 4. Sanitize tool responses before they re-enter model context
 

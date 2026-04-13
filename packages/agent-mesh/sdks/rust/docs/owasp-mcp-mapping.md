@@ -7,9 +7,11 @@ This document maps the Rust MCP governance surface in `agentmesh` and
 ## Coverage summary
 
 The Rust SDK provides direct runtime controls or integration hooks for
-**11 of the 12** best-practice sections in the cheat sheet. The remaining gap is
-**sandbox and host isolation**, which is intentionally left to the deployment
-environment rather than implemented inside the library.
+**11 of the 12** best-practice sections in the cheat sheet. The one section not
+implemented in-library is **Section 3: Sandbox and Isolate MCP Servers**. That
+gap is intentional: process isolation, syscall filtering, filesystem
+confinement, and outbound network controls belong to the deployment
+environment rather than the library.
 
 | Section | Cheat sheet area | Status | Rust controls |
 | --- | --- | --- | --- |
@@ -62,7 +64,10 @@ schemas.
 This Rust library does not attempt to create containers, jails, or OS-level
 network/file-system sandboxes. Use deployment controls such as containers,
 VMs, seccomp profiles, filesystem allowlists, and loopback-only bindings around
-the MCP host or server process.
+the MCP host or server process. To reduce sandbox-escape risk, run MCP servers
+as non-root users, avoid writable host mounts, default to read-only filesystems
+where possible, and restrict outbound egress to the specific services each tool
+needs.
 
 ## 4. Human-in-the-Loop for Sensitive Actions
 
@@ -123,7 +128,10 @@ verification, and secure credential stores remain deployment responsibilities.
 
 The signer applies HMAC-SHA256 to the full payload, timestamp, and nonce. Verify
 paths fail closed, reject stale timestamps, and atomically reserve nonces to
-block replay.
+block replay. Store signing secrets and session-token secrets in your existing
+KMS, HSM, or secret-management system rather than in source or static config,
+and rotate keys by issuing a new version before retiring the old one so active
+sessions can be drained safely.
 
 ## 8. Multi-Server Isolation & Cross-Origin Protection
 
