@@ -481,6 +481,11 @@ if (!result.IsValid) { /* reject — tampered, replayed, or expired */ }
 
 Uses `CryptographicOperations.FixedTimeEquals` for constant-time signature comparison (prevents timing attacks).
 
+> **Scope note:** `McpMessageSigner` protects MCP message integrity and replay at runtime.
+> It does **not** provide package signing, container signing, or build provenance
+> attestation for the SDK itself. Treat artifact provenance as a separate CI/CD
+> and deployment control.
+
 #### Post-Quantum Signing (.NET 10+)
 
 On .NET 10, ML-DSA-65 (NIST FIPS 204) provides future-ready quantum-resistant asymmetric signing; classical ECDSA/RSA signatures remain the current standard:
@@ -772,7 +777,7 @@ The MCP governance layer implements 11 of 12 sections from the [OWASP MCP Securi
 | 6 | Auth & Transport | McpSessionAuthenticator + mTLS (deployment) | ✅ |
 | 7 | Message Signing | McpMessageSigner (HMAC-SHA256 + ML-DSA-65 + nonce + replay) | ✅ |
 | 8 | Multi-Server Isolation | Cross-server detection + typosquatting + gateway | ✅ |
-| 9 | Supply Chain | Rug-pull detection + Trivy scanning + SBOM | ✅ |
+| 9 | Supply Chain | Rug-pull detection + deployment digest pinning + CI SBOM/Trivy controls | ✅ |
 | 10 | Logging & Auditing | AuditEmitter + CredentialRedactor + SIEM forwarding | ✅ |
 | 11 | Consent & Installation | Client UI concern (out of scope for SDK) | N/A |
 | 12 | Response Injection | McpResponseScanner (instruction tags, imperatives, credentials) | ✅ |
@@ -786,7 +791,7 @@ The .NET SDK addresses all 10 OWASP categories:
 | Goal Hijacking | Prompt injection detection + semantic policy conditions |
 | Tool Misuse | Capability allow/deny lists + execution ring enforcement + MCP gateway 5-stage pipeline |
 | Identity Abuse | DID-based identity + trust scoring + ring demotion + MCP session authentication |
-| Supply Chain | Build provenance attestation + MCP rug-pull detection (SHA-256 fingerprinting) |
+| Supply Chain | Deployment digest pinning + CI SBOM/Trivy controls + MCP rug-pull detection (SHA-256 fingerprinting) |
 | Code Execution | Rate limiting + ring-based resource limits + MCP tool-to-action classification |
 | Memory Poisoning | Stateless evaluation (no shared context) |
 | Insecure Comms | HMAC-SHA256 / ML-DSA-65 message signing + mTLS + replay protection |

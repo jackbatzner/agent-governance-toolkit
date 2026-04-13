@@ -187,6 +187,18 @@ Prevent a compromised tool from consuming cluster resources:
 | Process count | `pids-limit` cgroup (64 for simple tools) |
 | Network bandwidth | Use Cilium/Calico bandwidth annotations |
 
+## Provenance and Release Controls
+
+OWASP MCP supply-chain guidance needs controls outside the runtime library:
+
+- Pin container images by digest, not mutable tags
+- Generate and retain an SBOM in CI/CD for each MCP server build
+- Verify artifact signatures or provenance attestations before promotion to shared environments
+- Treat `McpMessageSigner` and tool fingerprinting as runtime integrity controls, not as substitutes for artifact provenance
+
+This matches the repo's cross-language MCP guidance: runtime message signing complements
+release-pipeline integrity checks, but does not replace them.
+
 ## Checklist
 
 - [ ] Non-root user (`runAsNonRoot: true`)
@@ -199,6 +211,8 @@ Prevent a compromised tool from consuming cluster resources:
 - [ ] gVisor/Kata for code execution tools
 - [ ] stdio transport where possible
 - [ ] Container images use SHA digest tags
+- [ ] SBOM generated and retained for each build
+- [ ] Artifact signatures or provenance attestations verified before deployment
 - [ ] `.NET SDK McpGateway` sanitization + response scanning enabled
 
 ## Related
