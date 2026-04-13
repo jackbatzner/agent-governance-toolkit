@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AgentGovernance\AgentGovernance.csproj" />
-    <ProjectReference Include="..\..\src\AgentGovernance.ModelContextProtocol\AgentGovernance.ModelContextProtocol.csproj" />
   </ItemGroup>
 
 </Project>
