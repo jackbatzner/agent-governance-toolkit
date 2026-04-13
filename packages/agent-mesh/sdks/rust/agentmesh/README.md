@@ -173,8 +173,8 @@ Ed25519-based agent identity with DID support.
 | `AgentIdentity::generate(agent_id, capabilities)` | Create a new identity |
 | `identity.sign(data)` | Sign data with private key |
 | `identity.verify(data, sig)` | Verify a signature |
-| `identity.to_json()` | Serialise public identity |
-| `AgentIdentity::from_json(json)` | Deserialise public identity |
+| `identity.to_json()` | Serialize public identity |
+| `AgentIdentity::from_json(json)` | Deserialize public identity |
 
 ## Policy YAML Format
 
