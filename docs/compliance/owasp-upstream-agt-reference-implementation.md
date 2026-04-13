@@ -28,7 +28,7 @@ flowchart LR
 
 ### AAI011: Agent Untraceability
 
-**Pattern:** emit tamper-evident audit records at every enforcement point. Plain logs are helpful; chained or hashed logs are better because they make after-the-fact editing detectable.
+**Pattern:** emit tamper-evident audit records at every enforcement point. Plain logs are helpful; chained or hashed logs are better because they make after-the-fact editing detectable. Tamper evidence is an integrity property, not a confidentiality property, so secrets still need to be redacted before persistence.
 
 **AGT evidence:** AGT emits CloudEvents-style audit entries with hashes in its MCP proxy, exposes a pluggable audit logger in Agent OS, and hash-chains anomaly assessments in Agent SRE.
 **References:** [mcp-proxy audit], [agent-os audit], [rogue detector]
@@ -72,7 +72,7 @@ flowchart LR
 
 **Pattern:** gate inter-agent delegation with explicit identity, allow/deny lists, trust thresholds, skill-specific overrides, and per-peer rate limits.
 
-**AGT evidence:** AGT's A2A `TrustGate` and MCP trust proxy both use this model. The transferable idea is that orchestration links should be authorized like high-risk API calls, not treated as friendly internal traffic.
+**AGT evidence:** AGT's A2A `TrustGate` and MCP trust proxy both use this model. The transferable idea is that orchestration links should be authorized like high-risk API calls, not treated as friendly internal traffic. Message-level trust still has to be paired with mutually authenticated transport and peer-identity verification in the surrounding deployment.
 **References:** [A2A trust gate], [mcp-trust proxy]
 
 ### AAI009: Agent Supply Chain and Dependency Attacks
@@ -116,8 +116,8 @@ The key architectural lesson is **layering**. Reviewer-side governance catches o
 ## Lessons Learned
 
 1. **Inline enforcement beats standalone scanners (see AAI003, AAI002).** Detection utilities are most valuable when they are wired directly into execution paths rather than left as reports someone may ignore.
-2. **Tamper evidence should be first-class (see AAI011).** Agent accountability is much stronger when audit records are chained or otherwise made tamper-evident.
-3. **Identity is not enough without trust and scope (see AAI001, AAI007).** DID-style identity helps, but agent systems still need capability limits, rate limits, and per-skill authorization.
+2. **Tamper evidence should be first-class (see AAI011).** Agent accountability is much stronger when audit records are chained or otherwise made tamper-evident, but those logs still need redaction because tamper evidence does not hide secrets.
+3. **Identity is not enough without trust and scope (see AAI001, AAI007).** DID-style identity helps, but agent systems still need capability limits, rate limits, per-skill authorization, and mutually authenticated transport for remote peers.
 4. **AAI014 and AAI012 remain partly sociotechnical.** Runtime anomaly detection and reviewer tooling help, but they do not replace human accountability, approval workflows, or domain-specific evaluation standards.
 5. **Standards are still needed** for portable trust assertions, agent-to-agent policy vocabularies, and interoperable tamper-evident audit formats across runtimes.
 
