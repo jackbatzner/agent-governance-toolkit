@@ -46,6 +46,14 @@ public class McpMessageSignerTests
     private static McpMessageSigner CreateSigner(byte[]? key = null, ManualTimeProvider? timeProvider = null) =>
         new(key ?? CreateTestKey(), new InMemoryMcpNonceStore(), timeProvider);
 
+    private static string BuildCanonicalString(
+        string algorithm,
+        string nonce,
+        DateTimeOffset timestamp,
+        string? senderId,
+        string payload) =>
+        $"{algorithm}|{nonce}|{timestamp.ToUnixTimeMilliseconds()}|{senderId ?? ""}|{payload}";
+
     // ── Signing ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -148,7 +156,8 @@ public class McpMessageSignerTests
             Nonce = envelope.Nonce,
             Timestamp = envelope.Timestamp,
             SenderId = envelope.SenderId,
-            Signature = envelope.Signature
+            Signature = envelope.Signature,
+            Algorithm = envelope.Algorithm
         };
 
         var result = signer.VerifyMessage(tampered);
@@ -171,7 +180,8 @@ public class McpMessageSignerTests
             Nonce = envelope.Nonce,
             Timestamp = envelope.Timestamp,
             SenderId = envelope.SenderId,
-            Signature = wrongSig
+            Signature = wrongSig,
+            Algorithm = envelope.Algorithm
         };
 
         var result = signer.VerifyMessage(tampered);
@@ -244,7 +254,8 @@ public class McpMessageSignerTests
         var payload = """{"method":"future"}""";
         var futureTimestamp = DateTimeOffset.UtcNow.AddMinutes(10);
         var nonce = Guid.NewGuid().ToString("N");
-        var canonicalString = $"{nonce}|{futureTimestamp.ToUnixTimeMilliseconds()}||{payload}";
+        const string algorithm = "HmacSha256";
+        var canonicalString = BuildCanonicalString(algorithm, nonce, futureTimestamp, null, payload);
         using var hmac = new HMACSHA256(key);
         var hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(canonicalString));
         var signature = Convert.ToBase64String(hash);
@@ -254,7 +265,8 @@ public class McpMessageSignerTests
             Payload = payload,
             Nonce = nonce,
             Timestamp = futureTimestamp,
-            Signature = signature
+            Signature = signature,
+            Algorithm = algorithm
         };
 
         var result = signer.VerifyMessage(futureEnvelope);
@@ -432,7 +444,8 @@ public class McpMessageSignerTests
             Nonce = envelope.Nonce,
             Timestamp = envelope.Timestamp,
             SenderId = envelope.SenderId,
-            Signature = Convert.ToBase64String(sigBytes)
+            Signature = Convert.ToBase64String(sigBytes),
+            Algorithm = envelope.Algorithm
         };
 
         var result = signer.VerifyMessage(tampered);
@@ -454,7 +467,8 @@ public class McpMessageSignerTests
             Payload = """{"method":"test"}""",
             Nonce = Guid.NewGuid().ToString("N"),
             Timestamp = DateTimeOffset.UtcNow,
-            Signature = "not-valid-base64!!!"
+            Signature = "not-valid-base64!!!",
+            Algorithm = "HmacSha256"
         };
 
         var result = signer.VerifyMessage(envelope);
@@ -520,6 +534,48 @@ public class McpMessageSignerTests
         var signer = CreateSigner();
         var envelope = signer.SignMessage("""{"id":1}""");
         Assert.Equal("HmacSha256", envelope.Algorithm);
+    }
+
+    [Fact]
+    public void VerifyMessage_MissingAlgorithm_Fails()
+    {
+        var signer = CreateSigner();
+        var envelope = signer.SignMessage("""{"id":1}""");
+        var tampered = new McpSignedEnvelope
+        {
+            Payload = envelope.Payload,
+            Nonce = envelope.Nonce,
+            Timestamp = envelope.Timestamp,
+            SenderId = envelope.SenderId,
+            Signature = envelope.Signature,
+            Algorithm = null
+        };
+
+        var result = signer.VerifyMessage(tampered);
+
+        Assert.False(result.IsValid);
+        Assert.Equal("Missing signing algorithm.", result.FailureReason);
+    }
+
+    [Fact]
+    public void VerifyMessage_TamperedAlgorithmLabel_Fails()
+    {
+        var signer = CreateSigner();
+        var envelope = signer.SignMessage("""{"id":1}""");
+        var tampered = new McpSignedEnvelope
+        {
+            Payload = envelope.Payload,
+            Nonce = envelope.Nonce,
+            Timestamp = envelope.Timestamp,
+            SenderId = envelope.SenderId,
+            Signature = envelope.Signature,
+            Algorithm = "MLDsa65"
+        };
+
+        var result = signer.VerifyMessage(tampered);
+
+        Assert.False(result.IsValid);
+        Assert.Equal("Signing algorithm mismatch.", result.FailureReason);
     }
 
 #if NET10_0_OR_GREATER

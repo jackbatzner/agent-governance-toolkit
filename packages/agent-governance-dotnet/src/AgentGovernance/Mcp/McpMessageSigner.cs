@@ -31,7 +31,8 @@ public enum SigningAlgorithm
 /// On .NET 10+: Optionally uses ML-DSA-65 (NIST FIPS 204) post-quantum asymmetric signing
 /// for non-repudiation and quantum resistance.
 /// Each signed message includes a nonce (GUID) and timestamp. Messages with duplicate nonces
-/// or timestamps outside the replay window are rejected. Fail-closed on verification failure.
+/// or timestamps outside the replay window are rejected. The advertised algorithm is part of the
+/// authenticated payload so downgrade or confusion attacks fail closed during verification.
 /// </para>
 /// </summary>
 public sealed class McpMessageSigner : IDisposable
@@ -65,6 +66,7 @@ public sealed class McpMessageSigner : IDisposable
     public SigningAlgorithm Algorithm => _algorithm;
 
     private DateTimeOffset _lastCleanup;
+    private string AlgorithmName => _algorithm.ToString();
 
     /// <summary>
     /// Initializes a new message signer with the given shared secret (HMAC-SHA256).
@@ -167,7 +169,7 @@ public sealed class McpMessageSigner : IDisposable
         var timestamp = _timeProvider.GetUtcNow();
 
         // Canonical string to sign: nonce|timestamp_unix_ms|senderId|payload
-        var canonicalString = BuildCanonicalString(nonce, timestamp, senderId, payload);
+        var canonicalString = BuildCanonicalString(AlgorithmName, nonce, timestamp, senderId, payload);
         var signature = ComputeSignature(canonicalString);
 
         return new McpSignedEnvelope
@@ -177,7 +179,7 @@ public sealed class McpMessageSigner : IDisposable
             Timestamp = timestamp,
             SenderId = senderId,
             Signature = signature,
-            Algorithm = _algorithm.ToString()
+            Algorithm = AlgorithmName
         };
     }
 
@@ -192,6 +194,12 @@ public sealed class McpMessageSigner : IDisposable
 
         try
         {
+            if (string.IsNullOrWhiteSpace(envelope.Algorithm))
+                return McpVerificationResult.Failed("Missing signing algorithm.");
+
+            if (!string.Equals(envelope.Algorithm, AlgorithmName, StringComparison.Ordinal))
+                return McpVerificationResult.Failed("Signing algorithm mismatch.");
+
             // 1. Check timestamp within replay window
             var age = _timeProvider.GetUtcNow() - envelope.Timestamp;
             if (age > ReplayWindow || age < -ReplayWindow)
@@ -199,7 +207,7 @@ public sealed class McpMessageSigner : IDisposable
 
             // 2. Verify signature FIRST (before caching nonce, to prevent cache pollution)
             var canonicalString = BuildCanonicalString(
-                envelope.Nonce, envelope.Timestamp, envelope.SenderId, envelope.Payload);
+                envelope.Algorithm, envelope.Nonce, envelope.Timestamp, envelope.SenderId, envelope.Payload);
 
             if (!VerifySignature(canonicalString, envelope.Signature))
             {
@@ -262,10 +270,15 @@ public sealed class McpMessageSigner : IDisposable
 #endif
     }
 
-    private string BuildCanonicalString(string nonce, DateTimeOffset timestamp, string? senderId, string payload)
+    private string BuildCanonicalString(
+        string algorithm,
+        string nonce,
+        DateTimeOffset timestamp,
+        string? senderId,
+        string payload)
     {
         var unixMs = timestamp.ToUnixTimeMilliseconds();
-        return $"{nonce}|{unixMs}|{senderId ?? ""}|{payload}";
+        return $"{algorithm}|{nonce}|{unixMs}|{senderId ?? ""}|{payload}";
     }
 
     private string ComputeSignature(string data)
@@ -358,7 +371,10 @@ public sealed class McpSignedEnvelope
     /// <summary>HMAC-SHA256 or ML-DSA-65 signature (base64-encoded).</summary>
     public required string Signature { get; init; }
 
-    /// <summary>Algorithm used to produce the signature (e.g., "HmacSha256" or "MLDsa65").</summary>
+    /// <summary>
+    /// Algorithm used to produce the signature (e.g., "HmacSha256" or "MLDsa65").
+    /// This metadata is authenticated as part of the signed envelope.
+    /// </summary>
     public string? Algorithm { get; init; }
 }
 
