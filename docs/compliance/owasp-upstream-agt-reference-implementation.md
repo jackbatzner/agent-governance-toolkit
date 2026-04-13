@@ -23,70 +23,70 @@ flowchart LR
 
 **Pattern:** separate authorization from tool implementation. Every tool call or delegation should pass through a gate that can deny by default, require identity, require capabilities, and apply per-tool thresholds.
 
-**AGT evidence:** AGT implements this pattern in the MCP proxy policy engine, the MCP trust proxy, and the A2A trust gate. The transferable idea is to keep authorization in the broker or middleware layer rather than relying on each tool to defend itself.  
+**AGT evidence:** AGT implements this pattern in the MCP proxy policy engine, the MCP trust proxy, and the A2A trust gate. The transferable idea is to keep authorization in the broker or middleware layer rather than relying on each tool to defend itself.
 **References:** [mcp-proxy policy], [mcp-trust proxy], [A2A trust gate]
 
 ### AAI011: Agent Untraceability
 
 **Pattern:** emit tamper-evident audit records at every enforcement point. Plain logs are helpful; chained or hashed logs are better because they make after-the-fact editing detectable.
 
-**AGT evidence:** AGT emits CloudEvents-style audit entries with hashes in its MCP proxy, exposes a pluggable audit logger in Agent OS, and hash-chains anomaly assessments in Agent SRE.  
+**AGT evidence:** AGT emits CloudEvents-style audit entries with hashes in its MCP proxy, exposes a pluggable audit logger in Agent OS, and hash-chains anomaly assessments in Agent SRE.
 **References:** [mcp-proxy audit], [agent-os audit], [rogue detector]
 
 ### AAI002: Agent Critical Systems Interaction
 
 **Pattern:** put dangerous tools behind a narrow execution boundary, validate arguments before execution, and keep an emergency stop outside the agent's own control path.
 
-**AGT evidence:** AGT applies argument sanitization in the MCP proxy, kernel/user separation in Agent OS, and signal-based pause/terminate controls in the control plane.  
+**AGT evidence:** AGT applies argument sanitization in the MCP proxy, kernel/user separation in Agent OS, and signal-based pause/terminate controls in the control plane.
 **References:** [mcp-proxy sanitizer], [kernel space], [control signals]
 
 ### AAI014: Agent Alignment Faking Vulnerability
 
 **Pattern:** treat alignment as an operational property that must be monitored continuously, not as a one-time prompt or static policy. Detect behavior drift and quarantine agents whose observed actions depart from expected profiles.
 
-**AGT evidence:** AGT's rogue-agent controls score frequency spikes, entropy anomalies, and capability-profile violations, and its MAF middleware can terminate execution when quarantine is recommended. **This is only partial coverage**: it detects suspicious behavior, but it does not prove internal alignment.  
+**AGT evidence:** AGT's rogue-agent controls score frequency spikes, entropy anomalies, and capability-profile violations, and its MAF middleware can terminate execution when quarantine is recommended. **This is only partial coverage**: it detects suspicious behavior, but it does not prove internal alignment.
 **References:** [rogue detector], [MAF rogue middleware]
 
 ### AAI003: Agent Goal and Instruction Manipulation
 
 **Pattern:** screen instructions and tool arguments at ingress with layered detectors, including direct override phrases, delimiter abuse, encoded payloads, multi-turn escalation, and canary leakage; fail closed when the detector itself errors.
 
-**AGT evidence:** AGT implements this in its prompt-injection detector and in the MCP proxy sanitizer. The reusable pattern is layered screening before tool selection or execution.  
+**AGT evidence:** AGT implements this in its prompt-injection detector and in the MCP proxy sanitizer. The reusable pattern is layered screening before tool selection or execution.
 **References:** [prompt injection], [mcp-proxy sanitizer]
 
 ### AAI005: Agent Impact Chain and Blast Radius
 
 **Pattern:** assume compromise and contain it locally. Combine privilege separation, per-agent circuit breakers, and quarantine so that one failing or hijacked agent cannot take down the rest of the system.
 
-**AGT evidence:** AGT uses protection rings and kernel/user isolation in Agent OS, per-agent circuit breakers and cascade detection in Agent SRE, and quarantine-capable middleware in the MAF integration path.  
+**AGT evidence:** AGT uses protection rings and kernel/user isolation in Agent OS, per-agent circuit breakers and cascade detection in Agent SRE, and quarantine-capable middleware in the MAF integration path.
 **References:** [kernel space], [control signals], [circuit breaker], [MAF rogue middleware]
 
 ### AAI006: Agent Memory and Context Manipulation
 
 **Pattern:** treat memory writes like untrusted input. Validate before storing, hash stored content, and rescan long-lived context for poisoning and integrity drift.
 
-**AGT evidence:** AGT's `MemoryGuard` blocks suspicious writes, records content hashes, and rescans persisted entries for poisoning indicators and hash mismatches.  
+**AGT evidence:** AGT's `MemoryGuard` blocks suspicious writes, records content hashes, and rescans persisted entries for poisoning indicators and hash mismatches.
 **References:** [memory guard]
 
 ### AAI007: Agent Orchestration and Multi-Agent Exploitation
 
 **Pattern:** gate inter-agent delegation with explicit identity, allow/deny lists, trust thresholds, skill-specific overrides, and per-peer rate limits.
 
-**AGT evidence:** AGT's A2A `TrustGate` and MCP trust proxy both use this model. The transferable idea is that orchestration links should be authorized like high-risk API calls, not treated as friendly internal traffic.  
+**AGT evidence:** AGT's A2A `TrustGate` and MCP trust proxy both use this model. The transferable idea is that orchestration links should be authorized like high-risk API calls, not treated as friendly internal traffic.
 **References:** [A2A trust gate], [mcp-trust proxy]
 
 ### AAI009: Agent Supply Chain and Dependency Attacks
 
 **Pattern:** combine development-time and release-time controls: exact version pinning, freshness windows for new packages, typosquat detection, lockfile drift checks, and SBOM generation.
 
-**AGT evidence:** AGT's `SupplyChainGuard` checks pinned versions, fresh releases, typosquats, and lockfile drift; the repository also ships a CycloneDX SBOM generator. **This is strongest when enforced in CI**; some checks are advisory until wired into hard-fail pipelines.  
+**AGT evidence:** AGT's `SupplyChainGuard` checks pinned versions, fresh releases, typosquats, and lockfile drift; the repository also ships a CycloneDX SBOM generator. **This is strongest when enforced in CI**; some checks are advisory until wired into hard-fail pipelines.
 **References:** [supply chain guard], [sbom generator], [supply chain tests]
 
 ### AAI012: Agent Checker Out of the Loop Vulnerability
 
 **Pattern:** move governance review left. Give reviewers concrete checks for missing middleware, missing audit logging, absent trust verification, and unconstrained tool access before the system is deployed.
 
-**AGT evidence:** AGT's Copilot governance reviewer flags exactly those gaps in code review and ships an OWASP catalogue to attach risk context to findings. **This is also partial coverage**: tooling can make review actionable, but human approval still requires organizational decision rights.  
+**AGT evidence:** AGT's Copilot governance reviewer flags exactly those gaps in code review and ships an OWASP catalogue to attach risk context to findings. **This is also partial coverage**: tooling can make review actionable, but human approval still requires organizational decision rights.
 **References:** [copilot reviewer], [copilot owasp], [copilot readme]
 
 ## Deployment Architecture
