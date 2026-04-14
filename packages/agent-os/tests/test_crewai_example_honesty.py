@@ -30,10 +30,10 @@ def test_getting_started_scope_note_is_honest():
     )
 
     note = module.EXAMPLE_SCOPE_NOTE.lower()
-    assert "does not import" in note
+    assert "imports real" in note
     assert "crewai" in note
     assert "real" in note
-    assert "shim" in note
+    assert "native" in note
 
 
 def test_demo_scope_note_is_honest():

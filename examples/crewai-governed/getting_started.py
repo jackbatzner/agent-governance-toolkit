@@ -40,6 +40,12 @@ sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-os" / "src"))
 from agent_os.integrations import CrewAIKernel
 from agent_os.integrations.base import GovernancePolicy, PolicyViolationError
 
+EXAMPLE_SCOPE_NOTE = (
+    "Repo-local walkthrough: this script imports real `crewai` and uses native "
+    "Agent/Task/Crew objects; the local DemoLLM keeps execution reproducible "
+    "without calling a hosted model."
+)
+
 
 class DemoLLM(BaseLLM):
     """Deterministic local LLM used to keep the example reproducible."""
@@ -120,6 +126,7 @@ def main() -> None:
     print("=" * 64)
     print("  CrewAI + Governance Toolkit — Native Getting Started")
     print("=" * 64)
+    print(f"  Scope: {EXAMPLE_SCOPE_NOTE}")
     print("  Uses real CrewAI Agent/Task/Crew objects plus CrewAIKernel.wrap().")
     print("  DemoLLM keeps the example local and reproducible (no API key needed).")
 
