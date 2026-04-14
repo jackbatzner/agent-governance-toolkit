@@ -32,8 +32,8 @@ class GovernanceHooks(RunHooksBase[Any, Agent]):
         audit_log: Optional[AuditLog] = None,
     ):
         self.policy = policy
-        self.scorer = scorer or TrustScorer()
-        self.audit_log = audit_log or AuditLog()
+        self.scorer = scorer if scorer is not None else TrustScorer()
+        self.audit_log = audit_log if audit_log is not None else AuditLog()
         self._tool_call_counts: dict[str, int] = {}
         self._agent_start_times: dict[str, float] = {}
 
@@ -148,4 +148,3 @@ class GovernanceHooks(RunHooksBase[Any, Agent]):
             "warnings": len([e for e in entries if e.decision == "warn"]),
             "chain_valid": self.audit_log.verify_chain(),
         }
-
