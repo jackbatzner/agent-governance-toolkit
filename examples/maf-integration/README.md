@@ -17,8 +17,9 @@ and run. No shared code, no cross-folder imports.
 | 04 | [**IT Helpdesk**](./04-it-helpdesk/) | Enterprise IT | Privilege escalation prevention, credential access blocking, infrastructure protection |
 | 05 | [**DevOps Deploy**](./05-devops-deploy/) | DevOps | Production deployment gates, destructive operation blocking, deployment storm detection |
 
-Each scenario includes both **Python** and **.NET** implementations with identical
-governance behavior.
+Each scenario includes both **Python** and **.NET** implementations with comparable
+governance flows. The .NET projects are single-file console demos, and this example
+surface is validated with `dotnet build` across all five scenario folders.
 
 ## Quick Start
 
@@ -41,6 +42,7 @@ python main.py
 ```bash
 cd 01-loan-processing/dotnet
 dotnet restore
+dotnet build
 
 # Option A: Free LLM via GitHub Models (recommended)
 export GITHUB_TOKEN=$(gh auth token)
