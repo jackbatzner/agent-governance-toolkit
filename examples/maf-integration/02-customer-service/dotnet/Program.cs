@@ -46,6 +46,8 @@ static class C
 // Display helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
+internal static class Program
+{
 static void PrintHeader()
 {
     var w = 64;
@@ -395,7 +397,7 @@ class AuditEntry
     {
         var payload = $"{Index}|{Timestamp}|{EventType}|{Detail}|{PrevHash}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
-        return Convert.ToHexStringLower(hash);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }
 
@@ -687,6 +689,8 @@ static void Act4AuditTrail(AuditTrail audit)
 // Main
 // ═══════════════════════════════════════════════════════════════════════════
 
+static int Main()
+{
 PrintHeader();
 
 var (llmCaller, backend) = CreateLlmClient();
@@ -700,7 +704,7 @@ if (!File.Exists(policyPath))
 if (!File.Exists(policyPath))
 {
     Console.WriteLine($"{C.Red}✗ Policy file not found: {policyPath}{C.Reset}");
-    return;
+    return 1;
 }
 
 var engine = PolicyEngine.FromYaml(policyPath);
@@ -732,3 +736,6 @@ Console.WriteLine($"{C.Cyan}{C.Bold}║  {C.Green}Demo complete!{C.Reset}{C.Cyan
 Console.WriteLine($"{C.Cyan}{C.Bold}║  {C.Dim}{C.White}All 4 governance layers demonstrated successfully{new string(' ', 12)}{C.Cyan}{C.Bold}║{C.Reset}");
 Console.WriteLine($"{C.Cyan}{C.Bold}╚{hLine}╝{C.Reset}");
 Console.WriteLine();
+return 0;
+}
+}

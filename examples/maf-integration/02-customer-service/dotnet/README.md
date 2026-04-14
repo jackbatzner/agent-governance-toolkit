@@ -56,7 +56,7 @@ how the Agent Governance Toolkit enforces four layers of governance in real time
 ### 1. Run in simulated mode (no API key needed)
 
 ```bash
-cd demo/maf-scenarios/02-customer-service/dotnet
+cd examples/maf-integration/02-customer-service/dotnet
 dotnet run
 ```
 

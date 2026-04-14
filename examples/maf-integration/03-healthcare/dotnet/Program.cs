@@ -375,7 +375,7 @@ class AuditTrail
     static string ComputeSha256(string input)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexStringLower(bytes);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 }
 
@@ -569,6 +569,10 @@ static class HealthcareTools
 // Main demo — 4 Acts
 // ═══════════════════════════════════════════════════════════════════════════
 
+internal static class Program
+{
+public static int Main()
+{
 Display.Header(
     "\U0001f3e5 MedAssist — HIPAA Patient Data Governance Demo",
     "Agent Governance Toolkit · MAF Middleware · Merkle Audit");
@@ -583,7 +587,7 @@ if (!File.Exists(policyPath))
 if (!File.Exists(policyPath))
 {
     Console.WriteLine($"{Display.Red}✗ Policy file not found{Display.Reset}");
-    return;
+    return 1;
 }
 
 var engine = new PolicyEngine(policyPath);
@@ -789,3 +793,6 @@ Console.WriteLine();
 Console.WriteLine($"  {Display.Bold}All governance enforcement ran inline — " +
     $"no requests bypassed the middleware stack.{Display.Reset}");
 Console.WriteLine();
+return 0;
+}
+}
