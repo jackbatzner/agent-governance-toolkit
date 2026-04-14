@@ -21,6 +21,7 @@ builder.Services.AddSingleton(static _ =>
     });
 
     kernel.LoadPolicyFromYaml("""
+        apiVersion: governance.toolkit/v1
         name: "official-sdk-sample"
         version: "1.0"
         default_action: deny
