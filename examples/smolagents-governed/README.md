@@ -1,4 +1,4 @@
-# 🤗 Hugging Face smolagents + Governance Toolkit — End-to-End Demo
+# 🤗 Hugging Face smolagents Governance Patterns Demo
 
 > A 4-role governance walkthrough shaped like a smolagents research
 > crew. This example uses **real** agent-governance-toolkit policy
@@ -15,7 +15,7 @@ python examples/smolagents-governed/getting_started.py
 ```
 
 `getting_started.py` is a **~150-line** copy-paste-friendly example showing
-the core integration pattern:
+the core governance pattern for a smolagents-shaped workflow:
 
 ```python
 from agent_os.policies.evaluator import PolicyEvaluator
@@ -93,12 +93,13 @@ python examples/smolagents-governed/smolagents_governance_demo.py
         agentmesh.governance   agent_sre.anomaly
 ```
 
-## How smolagents Hooks Work
+## How This Maps to smolagents
 
 Hugging Face [smolagents](https://github.com/huggingface/smolagents) provides
 two agent types — `CodeAgent` (generates Python code to call tools) and
-`ToolCallingAgent` (emits structured JSON tool calls). The governance toolkit
-intercepts at three points:
+`ToolCallingAgent` (emits structured JSON tool calls). This folder does not
+instantiate those runtime objects directly; it uses lighter local shims so the
+governance behavior stays easy to run and reproduce.
 
 This repository also includes a real `SmolagentsKernel` in
 `agent_os.integrations.smolagents_adapter` for live tool wrapping. The
@@ -124,6 +125,10 @@ policy behavior without needing a live smolagents runtime.
 ```bash
 # Install the toolkit
 pip install agent-governance-toolkit[full]
+
+# Optional: only needed if you want to experiment with the live
+# smolagents adapter surface in agent_os.integrations.smolagents_adapter
+pip install smolagents
 
 # Optional: set an API key if you want live LLM responses.
 # The governance walkthrough still runs with simulated responses if no key is set.

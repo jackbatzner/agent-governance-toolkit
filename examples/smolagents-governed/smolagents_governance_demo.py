@@ -123,8 +123,8 @@ def _banner() -> str:
     return "\n".join(
         [
             f"{C.CYAN}{C.BOLD}{C.BOX_TL}{C.BOX_H * w}{C.BOX_TR}{C.RESET}",
-            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.WHITE}🤗 smolagents + Governance Toolkit — End-to-End Demo{' ' * (w - 54)}{C.CYAN}{C.BOX_V}{C.RESET}",
-            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.DIM}{C.WHITE}4-role simulation · Real policies · Merkle-chained audit{' ' * (w - 59)}{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}",
+            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.WHITE}🤗 smolagents Governance Patterns Demo{' ' * (w - 49)}{C.CYAN}{C.BOX_V}{C.RESET}",
+            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.DIM}{C.WHITE}4-role workflow · Real policies · Merkle-chained audit{' ' * (w - 54)}{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}",
             f"{C.CYAN}{C.BOLD}{C.BOX_BL}{C.BOX_H * w}{C.BOX_BR}{C.RESET}",
         ]
     )
@@ -539,6 +539,41 @@ async def scenario_3(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+def _deterministic_burst_assessments(
+    rogue_detector: RogueAgentDetector,
+    agent_name: str = "data_analyst",
+    *,
+    now: float | None = None,
+) -> tuple[RogueAssessment, RogueAssessment]:
+    """Create reproducible baseline and burst assessments for the demo."""
+    current_time = time.time() if now is None else now
+    baseline_counts = [1, 2, 1, 2, 1]
+
+    for window_index, count in enumerate(baseline_counts):
+        bucket_ts = current_time - (len(baseline_counts) - window_index) * 61
+        for sample_index in range(count):
+            rogue_detector.record_action(
+                agent_name,
+                f"baseline_{window_index}_{sample_index}",
+                "compute_stats",
+                timestamp=bucket_ts,
+            )
+
+    rogue_detector.record_action(agent_name, "baseline_current", "compute_stats", timestamp=current_time)
+    baseline = rogue_detector.assess(agent_name, timestamp=current_time)
+
+    for call_index in range(50):
+        rogue_detector.record_action(
+            agent_name,
+            f"burst_{call_index}",
+            "compute_stats",
+            timestamp=current_time,
+        )
+
+    burst = rogue_detector.assess(agent_name, timestamp=current_time)
+    return baseline, burst
+
+
 async def scenario_4(
     rogue_detector: RogueAgentDetector,
     rogue_mw: RogueDetectionMiddleware,
@@ -552,42 +587,19 @@ async def scenario_4(
           f"  action entropy, and capability deviation. A burst of"
           f"  50 calls from the data_analyst triggers quarantine.{C.RESET}\n")
 
-    agent_name = "data_analyst"
-
-    # Establish a deterministic multi-window baseline so the follow-up burst
-    # produces a reproducible frequency anomaly in local runs.
     print(f"  {C.DIM}Establishing deterministic baseline behaviour...{C.RESET}")
-    now = time.time()
-    baseline_counts = [1, 2, 1, 2, 1]
-    for window_index, count in enumerate(baseline_counts):
-        bucket_ts = now - (len(baseline_counts) - window_index) * 61
-        for sample_index in range(count):
-            rogue_detector.record_action(
-                agent_name,
-                f"baseline_{window_index}_{sample_index}",
-                "compute_stats",
-                timestamp=bucket_ts,
-            )
+    baseline, burst = _deterministic_burst_assessments(rogue_detector)
+    print(_tree("📊", C.GREEN, "Baseline", f"risk={C.GREEN}{baseline.risk_level.name}{C.RESET}"))
 
-    rogue_detector.record_action(agent_name, "baseline_current", "compute_stats", timestamp=now)
-
-    assessment = rogue_detector.assess(agent_name, timestamp=now)
-    print(_tree("📊", C.GREEN, "Baseline", f"risk={C.GREEN}{assessment.risk_level.name}{C.RESET}"))
-
-    # Simulate a burst
     print(f"\n  {C.DIM}Simulating 50-call burst...{C.RESET}")
-    for i in range(50):
-        rogue_detector.record_action(agent_name, f"burst_{i}", "compute_stats", timestamp=now)
+    risk_color = C.RED if burst.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL) else C.YELLOW
+    print(_tree("🚨", risk_color, "After burst", f"risk={risk_color}{burst.risk_level.name}{C.RESET}"))
+    print(_tree("📈", C.CYAN, "Frequency Z-score", f"{burst.frequency_score:.2f}"))
+    print(_tree("🎲", C.CYAN, "Entropy score", f"{burst.entropy_score:.2f}"))
+    print(_tree_last("⚡", C.CYAN, "Capability deviation", f"{burst.capability_score:.2f}"))
 
-    assessment = rogue_detector.assess(agent_name, timestamp=now)
-    risk_color = C.RED if assessment.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL) else C.YELLOW
-    print(_tree("🚨", risk_color, "After burst", f"risk={risk_color}{assessment.risk_level.name}{C.RESET}"))
-    print(_tree("📈", C.CYAN, "Frequency Z-score", f"{assessment.frequency_score:.2f}"))
-    print(_tree("🎲", C.CYAN, "Entropy score", f"{assessment.entropy_score:.2f}"))
-    print(_tree_last("⚡", C.CYAN, "Capability deviation", f"{assessment.capability_score:.2f}"))
-
-    if assessment.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
-        print(f"\n  {C.RED}{C.BOLD}🔒 Agent '{agent_name}' auto-quarantined{C.RESET}")
+    if burst.quarantine_recommended:
+        print(f"\n  {C.RED}{C.BOLD}🔒 Agent 'data_analyst' auto-quarantined{C.RESET}")
     else:
         print(f"\n  {C.YELLOW}Agent risk elevated but below quarantine threshold{C.RESET}")
 
@@ -605,7 +617,7 @@ async def scenario_5(
     audit_log: AuditLog,
     verbose: bool,
 ) -> None:
-    """Full 4-agent pipeline: Research → Analyze → Summarize → Publish."""
+    """Full 4-role pipeline: Research → Analyze → Summarize → Publish."""
     print(_section("Scenario 5: Full Agent Pipeline"))
 
     print(f"  {C.DIM}Runs the complete 4-role workflow with governance")
@@ -931,7 +943,7 @@ async def _run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="smolagents + Governance Toolkit — End-to-End Demo"
+        description="smolagents Governance Patterns Demo"
     )
     parser.add_argument(
         "--model", type=str, default=None, help="LLM model name (default: auto-detect)"
