@@ -125,8 +125,9 @@ export GOOGLE_API_KEY="..."
 checkout. It does **not** install the standalone `crewai-agentmesh` package or
 vendor LLM SDKs.
 
-If you want a native CrewAI runtime example, use
-`examples/quickstart/crewai_governed.py` and `agent_os.integrations.CrewAIKernel`.
+For the current CrewAI adapter surface, inspect
+`packages/agent-os/src/agent_os/integrations/crewai_adapter.py` and the
+CrewAI-focused tests under `packages/agent-os/tests/`.
 
 ## Running
 

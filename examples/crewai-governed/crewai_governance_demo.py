@@ -103,6 +103,12 @@ except ImportError:
         TrustedCrew,
     )
 
+EXAMPLE_SCOPE_NOTE = (
+    "Repo-local walkthrough: this script does not import `crewai`; the crew "
+    "workflow is simulated so the example stays runnable, while governance, "
+    "audit logging, trust gates, and rogue detection remain real."
+)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ANSI colour helpers  (degrades gracefully on dumb terminals)
@@ -1548,6 +1554,7 @@ async def main() -> None:
         f"{C.DIM}LLM calls:{C.RESET} {llm_label}"
     )
     print(f"  {C.DIM}Workflow: Researcher → Writer → Editor → Publisher{C.RESET}")
+    print(f"  {C.DIM}Scope:{C.RESET} {C.DIM}{EXAMPLE_SCOPE_NOTE}{C.RESET}")
     print(
         f"  {C.YELLOW}⚠  Policy:{C.RESET} {C.DIM}SAMPLE CONFIG — review and customize before production use.{C.RESET}"
     )

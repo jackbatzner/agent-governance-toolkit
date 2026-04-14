@@ -19,7 +19,9 @@ What this demonstrates:
   3. Run simulated agent messages through governance BEFORE calling the LLM
   4. Verify the tamper-proof audit trail
 
-For a native CrewAI wrapper example, see ``examples/quickstart/crewai_governed.py``.
+For the current CrewAI adapter surface, inspect
+``agent_os.integrations.crewai_adapter`` and the CrewAI-focused tests under
+``packages/agent-os/tests/``.
 For the larger simulated showcase, run ``crewai_governance_demo.py``.
 """
 
@@ -45,6 +47,12 @@ from agent_os.integrations.maf_adapter import (
     Message,
 )
 from agentmesh.governance.audit import AuditLog
+
+EXAMPLE_SCOPE_NOTE = (
+    "Repo-local walkthrough: this script does not import the `crewai` package "
+    "or run a native CrewAI crew. Governance checks and audit logging are real; "
+    "the agent contexts are lightweight shims."
+)
 
 
 # ── Step 1: Load your YAML governance policies ───────────────────────────
@@ -97,6 +105,7 @@ async def main() -> None:
     print("=" * 55)
     print("  CrewAI-style Governance Toolkit — Getting Started")
     print("=" * 55)
+    print(f"  NOTE: {EXAMPLE_SCOPE_NOTE}")
 
     # --- Check 1: Safe message passes policy ---
     print("\n[1] Researcher sends a safe query...")
