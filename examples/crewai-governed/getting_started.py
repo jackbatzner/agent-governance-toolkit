@@ -1,163 +1,134 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
-CrewAI-style Governance Toolkit — Getting Started
-=================================================
+CrewAI + Governance Toolkit — Native Getting Started
+====================================================
 
-Minimal governance walkthrough for a CrewAI-style workflow. This script does
-not import or run the ``crewai`` package; it shows the middleware and audit
-pattern you can place around a CrewAI crew or task runner.
+This example uses native CrewAI constructs (`Agent`, `Task`, `Crew`) and wraps
+the real CrewAI runtime with `agent_os.integrations.CrewAIKernel`.
 
 Run from a repo checkout:
 
     pip install agent-governance-toolkit[full]
+    pip install -r examples/crewai-governed/requirements.txt
     python examples/crewai-governed/getting_started.py
 
-What this demonstrates:
-  1. Load YAML governance policies
-  2. Wire up middleware (policy + capability guard + audit)
-  3. Run simulated agent messages through governance BEFORE calling the LLM
-  4. Verify the tamper-proof audit trail
-
-For the current CrewAI adapter surface, inspect
-``agent_os.integrations.crewai_adapter`` and the CrewAI-focused tests under
-``packages/agent-os/tests/``.
-For the larger simulated showcase, run ``crewai_governance_demo.py``.
+No external API key is required for this walkthrough. It uses a small
+deterministic local `DemoLLM` so the CrewAI runtime is exercised without
+calling a hosted model.
 """
 
 from __future__ import annotations
 
-import asyncio
+import re
 import sys
 from pathlib import Path
+from typing import Any
 
-# --- Setup: importable from a repo checkout after installing dependencies ---
-# (The sys.path lines below are only needed when running from the repository.
-# With an editable/local install, `from agent_os...` works directly.)
+try:
+    from crewai import Agent, Crew, Process, Task
+    from crewai.llms.base_llm import BaseLLM
+except ImportError as exc:  # pragma: no cover - user-facing guard
+    raise SystemExit(
+        "CrewAI is required for this example. Run "
+        "`pip install -r examples/crewai-governed/requirements.txt` first."
+    ) from exc
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-os" / "src"))
-sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-mesh" / "src"))
 
-from agent_os.policies.evaluator import PolicyEvaluator
-from agent_os.integrations.maf_adapter import (
-    GovernancePolicyMiddleware,
-    CapabilityGuardMiddleware,
-    MiddlewareTermination,
-    AgentResponse,
-    Message,
-)
-from agentmesh.governance.audit import AuditLog
-
-EXAMPLE_SCOPE_NOTE = (
-    "Repo-local walkthrough: this script does not import the `crewai` package "
-    "or run a native CrewAI crew. Governance checks and audit logging are real; "
-    "the agent contexts are lightweight shims."
-)
+from agent_os.integrations import CrewAIKernel
+from agent_os.integrations.base import GovernancePolicy, PolicyViolationError
 
 
-# ── Step 1: Load your YAML governance policies ───────────────────────────
+class DemoLLM(BaseLLM):
+    """Deterministic local LLM used to keep the example reproducible."""
 
-audit_log = AuditLog()
-evaluator = PolicyEvaluator()
-evaluator.load_policies(Path(__file__).parent / "policies")
-
-policy_middleware = GovernancePolicyMiddleware(
-    evaluator=evaluator, audit_log=audit_log
-)
-
-# ── Step 2: Set up capability guard per agent role ───────────────────────
-# This is the equivalent of declaring tools on a CrewAI Agent.
-# allowed_tools = what the agent CAN use; denied_tools = hard blocks.
-
-researcher_guard = CapabilityGuardMiddleware(
-    allowed_tools=["web_search", "read_file"],
-    denied_tools=["shell_exec", "publish_content"],
-    audit_log=audit_log,
-)
-
-
-# ── Step 3: Minimal context shims ────────────────────────────────────────
-# These adapt messages and tool calls to the middleware interface.
-# In production, framework adapters such as CrewAIKernel handle this for you.
-
-class AgentContext:
-    """Wraps an agent message for the governance middleware."""
-
-    def __init__(self, agent_name: str, user_message: str) -> None:
-        self.agent = type("A", (), {"name": agent_name})()
-        self.messages = [Message("user", [user_message])]
-        self.metadata: dict = {}
-        self.stream = False
-        self.result: AgentResponse | None = None
-
-
-class ToolContext:
-    """Wraps a tool invocation for the capability guard."""
-
-    def __init__(self, tool_name: str) -> None:
-        self.function = type("F", (), {"name": tool_name})()
-        self.result: str | None = None
-
-
-# ── Step 4: Run governance checks ────────────────────────────────────────
-
-async def main() -> None:
-    print("=" * 55)
-    print("  CrewAI-style Governance Toolkit — Getting Started")
-    print("=" * 55)
-    print(f"  NOTE: {EXAMPLE_SCOPE_NOTE}")
-
-    # --- Check 1: Safe message passes policy ---
-    print("\n[1] Researcher sends a safe query...")
-    ctx = AgentContext("researcher", "Search for recent AI governance papers")
-
-    async def llm_call() -> None:
-        # Replace this with your actual CrewAI task execution or crew kickoff.
-        ctx.result = AgentResponse(
-            messages=[Message("assistant", ["Here are the top papers..."])]
+    def call(
+        self,
+        messages: Any,
+        tools: Any = None,
+        callbacks: Any = None,
+        available_functions: Any = None,
+        from_task: Any = None,
+        from_agent: Any = None,
+        response_model: Any = None,
+    ) -> str:
+        task_text = str(messages)
+        match = re.search(
+            r"Current Task:\s*Summarize (.+?) for the compliance bulletin\.",
+            task_text,
+            re.DOTALL,
         )
+        topic = match.group(1).strip() if match else "the requested topic"
+        return f"Final Answer: Safe CrewAI summary for {topic}."
 
+
+def build_governed_crew() -> object:
+    """Create a native CrewAI crew wrapped by the governance kernel."""
+    reviewer = Agent(
+        role="Compliance reviewer",
+        goal="Produce concise, policy-compliant summaries.",
+        backstory="A deterministic reviewer used for local integration demos.",
+        llm=DemoLLM(model="demo"),
+        allow_delegation=False,
+        verbose=False,
+    )
+
+    summary_task = Task(
+        description="Summarize {topic} for the compliance bulletin.",
+        expected_output="A concise safe summary.",
+        agent=reviewer,
+    )
+
+    native_crew = Crew(
+        name="governed-native-crewai-crew",
+        agents=[reviewer],
+        tasks=[summary_task],
+        process=Process.sequential,
+        tracing=False,
+        verbose=False,
+    )
+
+    policy = GovernancePolicy(
+        name="native-crewai-demo-policy",
+        blocked_patterns=["DROP TABLE", "rm -rf", "exfiltrate secrets"],
+    )
+    kernel = CrewAIKernel(policy=policy)
+    return kernel.wrap(native_crew)
+
+
+def run_blocked_scenario() -> None:
+    """Show governance stopping a native CrewAI kickoff before the LLM runs."""
+    governed_crew = build_governed_crew()
+    print("[1] Native CrewAI kickoff with blocked input...")
     try:
-        await policy_middleware.process(ctx, llm_call)  # type: ignore[arg-type]
-        print("    ALLOWED -- policy check passed")
-    except MiddlewareTermination:
-        print("    BLOCKED -- policy violation")
+        governed_crew.kickoff({"topic": "DROP TABLE users"})
+    except PolicyViolationError as exc:
+        print(f"    BLOCKED -- {exc}")
 
-    # --- Check 2: PII is blocked ---
-    print("\n[2] Writer tries to include an email address...")
-    ctx2 = AgentContext("writer", "Include john.doe@example.com in the report")
 
-    async def blocked_call() -> None:
-        ctx2.result = AgentResponse(messages=[Message("assistant", ["Done"])])
+def run_allowed_scenario() -> None:
+    """Show a safe native CrewAI kickoff succeeding."""
+    governed_crew = build_governed_crew()
+    print("\n[2] Native CrewAI kickoff with safe input...")
+    result = governed_crew.kickoff({"topic": "the regulated release"})
+    print(f"    ALLOWED -- {result}")
 
-    try:
-        await policy_middleware.process(ctx2, blocked_call)  # type: ignore[arg-type]
-        print("    ALLOWED")
-    except MiddlewareTermination:
-        print("    BLOCKED -- PII detected, LLM was never called")
 
-    # --- Check 3: Capability guard ---
-    print("\n[3] Researcher tries to use an unauthorized tool...")
-    tool_ctx = ToolContext("shell_exec")
+def main() -> None:
+    print("=" * 64)
+    print("  CrewAI + Governance Toolkit — Native Getting Started")
+    print("=" * 64)
+    print("  Uses real CrewAI Agent/Task/Crew objects plus CrewAIKernel.wrap().")
+    print("  DemoLLM keeps the example local and reproducible (no API key needed).")
 
-    async def tool_exec() -> None:
-        tool_ctx.result = "executed"
+    run_blocked_scenario()
+    run_allowed_scenario()
 
-    try:
-        await researcher_guard.process(tool_ctx, tool_exec)  # type: ignore[arg-type]
-        print("    ALLOWED")
-    except MiddlewareTermination:
-        print("    BLOCKED -- tool not in researcher's allowed list")
-
-    # --- Check 4: Verify audit trail ---
-    print("\n[4] Verifying audit trail...")
-    valid, err = audit_log.verify_integrity()
-    total = len(audit_log._chain._entries)
-    print(f"    {total} audit entries logged")
-    print(f"    Merkle chain integrity: {'VERIFIED' if valid else f'FAILED: {err}'}")
-
-    print("\nDone! See crewai_governance_demo.py for the larger simulated showcase.")
+    print("\nDone! For the broader non-native scenario showcase, see")
+    print("`examples/crewai-governed/crewai_governance_demo.py`.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

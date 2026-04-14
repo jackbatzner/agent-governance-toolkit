@@ -2,14 +2,16 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
-CrewAI-style Governance Toolkit — End-to-End Demo
-=================================================
+CrewAI-style Governance Toolkit — Supplemental Showcase
+=======================================================
 
 Runnable governance showcase for a 4-agent content workflow inspired by
 CrewAI. The governance middleware, audit logging, rogue detection, and
 ``crewai-agentmesh`` trust primitives are real; the workflow orchestration is
 simulated and does not instantiate native ``crewai.Agent``, ``Task``, or
 ``Crew`` objects.
+
+Use ``getting_started.py`` in this folder for the real CrewAI-native path.
 
 Nine governance scenarios are exercised end-to-end:
   1. Role-Based Tool Access   — CapabilityGuard limits tools per agent role

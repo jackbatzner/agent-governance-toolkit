@@ -8,6 +8,7 @@ with crew_name and task_id context as required by issue #184.
 """
 
 import logging
+import uuid
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
@@ -46,6 +47,16 @@ class TestCrewAILogging:
 
         assert any("research-crew" in record.message for record in caplog.records)
         assert any("Wrapping crew" in record.message for record in caplog.records)
+
+    def test_wrap_accepts_uuid_crew_id(self):
+        """Native CrewAI crews expose UUID ids; wrapping should accept them."""
+        kernel = CrewAIKernel()
+        crew = self._make_mock_crew(name="uuid-crew")
+        crew.id = uuid.uuid4()
+
+        governed = kernel.wrap(crew)
+
+        assert governed is not None
 
     def test_kickoff_logs_execution_start(self, caplog):
         """Kickoff should log execution start."""
@@ -136,6 +147,33 @@ class TestCrewAILogging:
         messages = [record.message for record in caplog.records]
         assert any("Wrapping individual agent" in m and "agent-crew" in m for m in messages)
         assert any("task_id=task-42" in m for m in messages)
+
+    def test_wrap_agent_logs_uuid_task_id(self, caplog):
+        """Task logging should stringify UUID task ids from native CrewAI tasks."""
+        kernel = CrewAIKernel()
+        task_id = uuid.uuid4()
+        mock_task = MagicMock()
+        mock_task.id = task_id
+
+        mock_agent = MagicMock()
+        mock_agent.name = "reviewer"
+        mock_agent.execute_task = MagicMock(return_value="task-result")
+
+        crew = self._make_mock_crew(name="uuid-task-crew")
+        crew.agents = [mock_agent]
+
+        def kickoff_with_agents(inputs=None):
+            for agent in crew.agents:
+                agent.execute_task(mock_task)
+            return "result"
+
+        crew.kickoff = kickoff_with_agents
+        governed = kernel.wrap(crew)
+
+        with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
+            governed.kickoff()
+
+        assert any(f"task_id={task_id}" in record.message for record in caplog.records)
 
     def test_convenience_wrap_function(self, caplog):
         """The convenience wrap() function should also produce logs."""

@@ -41,6 +41,14 @@ _PII_PATTERNS = [
 ]
 
 
+def _assign_wrapped_attr(target: Any, name: str, value: Any) -> None:
+    """Assign wrapped methods on SDK objects that may restrict setattr."""
+    try:
+        setattr(target, name, value)
+    except (AttributeError, TypeError, ValueError):
+        object.__setattr__(target, name, value)
+
+
 class CrewAIKernel(BaseIntegration):
     """
     CrewAI adapter for Agent OS.
@@ -73,7 +81,7 @@ class CrewAIKernel(BaseIntegration):
         - Individual tool calls within agents
         - Task completions
         """
-        crew_id = getattr(crew, 'id', None) or f"crew-{id(crew)}"
+        crew_id = str(getattr(crew, 'id', None) or f"crew-{id(crew)}")
         crew_name = getattr(crew, 'name', crew_id)
         ctx = self.create_context(crew_id)
         logger.info("Wrapping crew with governance: crew_name=%s, crew_id=%s", crew_name, crew_id)
@@ -187,8 +195,8 @@ class CrewAIKernel(BaseIntegration):
                     )
                     return original_run(*args, **kwargs)
 
-                tool._run = governed_run
-                tool._governed = True
+                _assign_wrapped_attr(tool, '_run', governed_run)
+                _assign_wrapped_attr(tool, '_governed', True)
 
             def _wrap_agent(self, agent):
                 """Add governance hooks to individual agent and its tools.
@@ -226,7 +234,7 @@ class CrewAIKernel(BaseIntegration):
                         Raises:
                             PolicyViolationError: If the execution violates the active policy.
                         """
-                        task_id = getattr(task, 'id', None) or str(id(task))
+                        task_id = str(getattr(task, 'id', None) or id(task))
                         logger.info("Agent task execution started: crew_name=%s, task_id=%s", crew_name, task_id)
                         if self._kernel.policy.require_human_approval:
                             raise PolicyViolationError(
@@ -242,7 +250,7 @@ class CrewAIKernel(BaseIntegration):
                             logger.warning("Post-execute violation: crew_name=%s, task_id=%s, reason=%s", crew_name, task_id, drift_reason)
                         logger.info("Agent task execution completed: crew_name=%s, task_id=%s", crew_name, task_id)
                         return result
-                    agent.execute_task = governed_execute
+                    _assign_wrapped_attr(agent, 'execute_task', governed_execute)
 
                 # Deep hooks at agent level
                 if self._kernel.deep_hooks_enabled:
@@ -324,7 +332,7 @@ class CrewAIKernel(BaseIntegration):
                 return _orig(*args, **kwargs)
 
             governed_step._step_governed = True
-            setattr(agent, step_attr, governed_step)
+            _assign_wrapped_attr(agent, step_attr, governed_step)
 
     def _intercept_crew_memory(
         self, agent: Any, ctx: Any, agent_name: str
@@ -397,7 +405,7 @@ class CrewAIKernel(BaseIntegration):
                     return result
 
                 governed_save._mem_governed = True
-                setattr(memory, save_method_name, governed_save)
+                _assign_wrapped_attr(memory, save_method_name, governed_save)
 
     def _detect_crew_delegation(
         self, agent: Any, ctx: Any, agent_name: str
@@ -457,7 +465,7 @@ class CrewAIKernel(BaseIntegration):
             return delegate_fn(*args, **kwargs)
 
         governed_delegate._delegation_governed = True
-        agent.delegate_work = governed_delegate
+        _assign_wrapped_attr(agent, 'delegate_work', governed_delegate)
 
 
 # Convenience function

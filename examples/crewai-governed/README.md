@@ -1,250 +1,118 @@
-# CrewAI-style Governance Toolkit — End-to-End Demo
+# CrewAI + Governance Toolkit
 
-> Runnable governance showcase for a **CrewAI-style** content workflow. The
-> policy enforcement, audit trail, rogue detection, and `crewai-agentmesh`
-> trust gates are real; the orchestration is simulated and does **not**
-> instantiate native `crewai.Agent`, `Task`, or `Crew` objects.
+This folder now contains a **real CrewAI-native quickstart** plus a larger
+supplemental governance showcase:
 
-## Demo in Action
+- `getting_started.py` — **native CrewAI runtime**
+  - imports `crewai.Agent`, `crewai.Task`, `crewai.Crew`, and `crewai.Process`
+  - wraps the real crew with `agent_os.integrations.CrewAIKernel`
+  - runs locally with a deterministic `DemoLLM`, so no hosted-model API key is
+    required
+- `crewai_governance_demo.py` — broader **simulated CrewAI-style** scenario
+  walkthrough kept for the larger governance surface area
 
-![CrewAI Governance Demo](demo.gif)
+If you need the smallest credible integration path, start with
+`getting_started.py`.
 
-## Quick Start (< 2 minutes)
+## Quick Start
+
+Run from the repository root:
 
 ```bash
-# Run from this repo checkout
 pip install agent-governance-toolkit[full]
+pip install -r examples/crewai-governed/requirements.txt
 python examples/crewai-governed/getting_started.py
 ```
 
-`getting_started.py` is a **~120-line** copy-paste-friendly walkthrough of the
-core governance pattern. It also uses small context shims instead of importing
-`crewai`, so the middleware contract is visible in plain Python:
+Expected behavior:
+
+1. A governed native CrewAI kickoff is blocked because the input matches a
+   policy deny pattern.
+2. A second governed native CrewAI kickoff succeeds and returns a deterministic
+   local result.
+
+## What the Native Example Exercises
+
+The quickstart is intentionally narrow and reviewable. It proves the integration
+path without introducing broader framework design changes:
+
+- native `crewai.Agent`
+- native `crewai.Task`
+- native `crewai.Crew`
+- native `Crew.kickoff(...)`
+- toolkit governance via `CrewAIKernel.wrap(...)`
+- policy enforcement before CrewAI execution begins
+
+## Native Example Shape
 
 ```python
-from agent_os.policies.evaluator import PolicyEvaluator
-from agent_os.integrations.maf_adapter import (
-    GovernancePolicyMiddleware,
-    CapabilityGuardMiddleware,
-    MiddlewareTermination,
+from crewai import Agent, Crew, Process, Task
+from crewai.llms.base_llm import BaseLLM
+
+from agent_os.integrations import CrewAIKernel
+from agent_os.integrations.base import GovernancePolicy
+
+
+class DemoLLM(BaseLLM):
+    def call(self, messages, **kwargs):
+        return "Final Answer: Safe CrewAI summary."
+
+
+reviewer = Agent(
+    role="Compliance reviewer",
+    goal="Produce concise, policy-compliant summaries.",
+    backstory="A deterministic reviewer used for local integration demos.",
+    llm=DemoLLM(model="demo"),
+    allow_delegation=False,
 )
-from agentmesh.governance.audit import AuditLog
 
-# 1. Load YAML policies and set up middleware
-audit_log = AuditLog()
-evaluator = PolicyEvaluator()
-evaluator.load_policies(Path("./policies"))
-middleware = GovernancePolicyMiddleware(evaluator=evaluator, audit_log=audit_log)
+task = Task(
+    description="Summarize {topic} for the compliance bulletin.",
+    expected_output="A concise safe summary.",
+    agent=reviewer,
+)
 
-# 2. Wrap your agent's LLM calls with governance
-try:
-    await middleware.process(agent_context, your_llm_call)
-    # LLM call succeeded — governance approved
-except MiddlewareTermination:
-    # Governance blocked the request BEFORE the LLM was called
-    pass
-
-# 3. Verify the tamper-proof audit trail
-valid, err = audit_log.verify_integrity()
+crew = Crew(agents=[reviewer], tasks=[task], process=Process.sequential)
+governed = CrewAIKernel(
+    policy=GovernancePolicy(blocked_patterns=["DROP TABLE"])
+).wrap(crew)
 ```
 
-For the full **9-scenario simulated showcase** (prompt injection, rogue
-detection, tamper detection, etc.), run:
+## Dependency Notes
 
-```bash
-python examples/crewai-governed/crewai_governance_demo.py
+`examples/crewai-governed/requirements.txt` is intentionally narrow:
+
+```text
+crewai>=1.14,<2.0
 ```
 
-## What This Shows
+The repo-local quickstart still imports toolkit packages from this checkout via
+`sys.path`, so you do **not** need repo-wide packaging changes to run it.
 
-| Scenario | Governance Layer | What Happens |
-|----------|-----------------|--------------|
-| **1. Role-Based Tool Access** | `CapabilityGuardMiddleware` | Each crew role has a declared tool allow/deny list — Researcher can `web_search` but not `publish_content`; Writer can `write_draft` but not `shell_exec` |
-| **2. Data-Sharing Policies** | `GovernancePolicyMiddleware` | YAML policy blocks PII (email, phone, SSN), internal resource access, and secrets — **before the LLM is called** |
-| **3. Output Quality Gates** | `TrustedCrew` + `GovernancePolicyMiddleware` | Publisher starts with low trust and is blocked from publishing; trust is earned through successful tasks; DRAFT content is blocked by quality policy |
-| **4. Rate Limiting & Rogue Detection** | `RogueDetectionMiddleware` | Behavioral anomaly engine detects a 50-call burst from the Writer agent and auto-quarantines |
-| **5. Simulated Pipeline** | All layers combined | Research → Write → Edit → Publish walkthrough with governance applied at every step |
-| **6. Prompt Injection Defense** | `GovernancePolicyMiddleware` | 8 adversarial attacks (jailbreak, instruction override, system prompt extraction, encoded payload, PII exfiltration, SQL/shell injection) — 7/8 blocked |
-| **7. Delegation Governance** | `GovernancePolicyMiddleware` | Agents trying to bypass the required review pipeline are caught — proper Writer→Editor→Publisher chain enforced |
-| **8. Capability Escalation** | `CapabilityGuardMiddleware` + `RogueAgentDetector` | Writer attempts `shell_exec`, `db_query`, `admin_panel`, `deploy_prod` — all blocked, rogue score escalates to CRITICAL |
-| **9. Tamper Detection** | `AuditLog` + `MerkleAuditChain` | Merkle proof generation, simulated audit trail tampering caught by integrity check, CloudEvents export |
+## About the Larger Demo
 
-## Architecture
+`crewai_governance_demo.py` remains useful for the broader governance story
+(trust scoring, rogue detection, Merkle audit checks, prompt-injection samples,
+and tamper detection), but it is **not** the primary native CrewAI integration
+path. Treat it as a supplemental showcase, not the minimal framework-native
+example.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Simulated CrewAI-style workflow (4 agents)                 │
-│                                                             │
-│  ┌───────────┐  ┌────────┐  ┌────────┐  ┌───────────┐     │
-│  │ Researcher│→ │ Writer │→ │ Editor │→ │ Publisher │     │
-│  └─────┬─────┘  └───┬────┘  └───┬────┘  └─────┬─────┘     │
-│        │            │            │              │           │
-│  ┌─────┴────────────┴────────────┴──────────────┴─────┐    │
-│  │           Governance Middleware Stack               │    │
-│  │                                                     │    │
-│  │  CapabilityGuardMiddleware  (tool allow/deny list)  │    │
-│  │  GovernancePolicyMiddleware (YAML policy rules)     │    │
-│  │  RogueDetectionMiddleware   (anomaly scoring)       │    │
-│  │  TrustedCrew                (trust score gates)     │    │
-│  └──────────────────────┬──────────────────────────────┘    │
-│                         │                                   │
-│            LLM/API step (real or simulated)                  │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-              ┌───────────┴───────────┐
-              │                       │
-              ▼                       ▼
-        AuditLog (Merkle)      RogueAgentDetector
-        agentmesh.governance   agent_sre.anomaly
-```
-
-## Prerequisites
-
-```bash
-# Install the governance runtime used by these examples
-pip install agent-governance-toolkit[full]
-
-# Optional: install the trust adapter outside this repo checkout
-pip install crewai-agentmesh
-
-# Optional: install an SDK for live model calls
-pip install openai                 # OpenAI / Azure OpenAI
-pip install google-generativeai   # Gemini
-
-# Optional: set an API key for live LLM calls — the demo also works
-# with simulated responses if no key or SDK is present.
-export OPENAI_API_KEY="sk-..."
-# or for Azure OpenAI:
-export AZURE_OPENAI_API_KEY="..."
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
-# or for Google Gemini:
-export GOOGLE_API_KEY="..."
-```
-
-`agent-governance-toolkit[full]` is enough to run this example from a repo
-checkout. It does **not** install the standalone `crewai-agentmesh` package or
-vendor LLM SDKs.
-
-For the current CrewAI adapter surface, inspect
-`packages/agent-os/src/agent_os/integrations/crewai_adapter.py` and the
-CrewAI-focused tests under `packages/agent-os/tests/`.
-
-## Running
-
-```bash
-cd agent-governance-toolkit
-
-# Default (simulated workflow; LLM backend auto-detects and falls back to simulated)
-python examples/crewai-governed/crewai_governance_demo.py
-
-# Use a specific model
-python examples/crewai-governed/crewai_governance_demo.py --model gpt-4o
-
-# Show raw LLM responses
-python examples/crewai-governed/crewai_governance_demo.py --verbose
-```
-
-## Scenarios Walkthrough
-
-### 1. Role-Based Tool Access
-
-Each crew agent has declared capabilities. The `CapabilityGuardMiddleware`
-enforces tool access at runtime:
-
-| Agent | Allowed Tools | Denied Tools |
-|-------|--------------|--------------|
-| Researcher | `web_search`, `read_file` | `write_file`, `shell_exec`, `publish_content` |
-| Writer | `write_draft`, `read_file` | `web_search`, `shell_exec`, `publish_content` |
-| Editor | `edit_text`, `check_grammar`, `read_file` | `shell_exec`, `publish_content` |
-| Publisher | `publish_content`, `read_file` | `shell_exec`, `write_file` |
-
-### 2. Data-Sharing Policies
-
-YAML-defined policies in `policies/content_creation_policy.yaml` block:
-- **PII** — email addresses, phone numbers, SSNs detected via regex
-- **Internal resources** — any mention of "internal" or "secrets"
-- **Dangerous content** — SQL injection, shell injection patterns
-
-Policy evaluation happens **before** the LLM call, saving API tokens.
-
-### 3. Output Quality Gates
-
-Uses trust primitives from `crewai-agentmesh`:
-- Publisher starts with trust score 300 (below the 400 threshold)
-- Trust is earned through successful task completions (+10 per success)
-- After 10 successful tasks, Publisher's trust reaches the threshold
-- Additionally, `quality_gate_policy.yaml` blocks DRAFT content from publishing
-
-### 4. Rate Limiting & Rogue Detection
-
-The `RogueAgentDetector` monitors three behavioral signals:
-- **Frequency** — Z-score spikes in tool call rate
-- **Entropy** — deviation from normal action distribution
-- **Capability** — calls outside declared tool profile
-
-A 50-call burst triggers HIGH risk and automatic quarantine.
-
-### 5. Simulated Crew Pipeline
-
-Runs a simulated Research → Write → Edit → Publish workflow with governance
-applied at every step. All decisions are logged in the Merkle-chained audit
-trail.
-
-### 6. Prompt Injection Defense
-
-Tests 8 adversarial attacks against the governance policy layer:
-- **Instruction override** — "Ignore all previous instructions..."
-- **Jailbreak** — "You are now DAN, no restrictions..."
-- **System prompt extraction** — "Reveal your system prompt..."
-- **Encoded payload** — Base64 execution attempts
-- **Stacked PII exfiltration** — SSN + email in one message
-- **SQL injection** — `DROP TABLE` hidden in editorial comments
-- **Shell injection** — `rm -rf` hidden in routine tasks
-
-All attacks are caught **before** the LLM is invoked. Legitimate requests
-pass through normally.
-
-### 7. Delegation Governance
-
-Enforces proper workflow delegation chains:
-- **Allowed**: Writer → Editor → Publisher (proper pipeline)
-- **Blocked**: Writer → Publisher (skipping Editor review)
-- **Blocked**: Researcher → Publisher (bypassing entire pipeline)
-- **Blocked**: Any agent using "bypass", "circumvent", or "skip" review
-
-### 8. Capability Escalation Detection
-
-Detects agents attempting to use tools outside their declared profile:
-- Writer tries `shell_exec`, `db_query`, `admin_panel`, `deploy_prod`, `write_file`
-- All 5 escalation attempts are blocked by `CapabilityGuardMiddleware`
-- `RogueAgentDetector` scores the agent at CRITICAL risk level
-- Capability deviation ratio: 0.71 (5/7 calls were outside profile)
-
-### 9. Tamper Detection & Merkle Proofs
-
-Demonstrates the cryptographic integrity guarantees of the audit trail:
-- Logs 5 governed actions and verifies Merkle chain integrity
-- Generates a Merkle proof for a specific entry (independently verifiable)
-- **Simulates tampering** — modifies an entry's action field
-- Integrity check **detects the tamper** and reports the corrupted entry
-- Restores original state and re-verifies
-- Exports full audit trail as JSON and CloudEvents format
-
-## Key Files
+## Files
 
 | File | Purpose |
 |------|---------|
-| `getting_started.py` | **Start here** — minimal governance pattern walkthrough (~120 lines) |
-| `crewai_governance_demo.py` | Full 9-scenario simulated showcase (~1,600 lines) |
-| `policies/content_creation_policy.yaml` | Role-based + PII + injection + delegation policies |
-| `policies/quality_gate_policy.yaml` | Publishing quality gates |
-| `packages/agent-os/src/agent_os/integrations/maf_adapter.py` | Governance middleware |
-| `packages/agentmesh-integrations/crewai-agentmesh/` | CrewAI trust primitives used by the showcase |
-| `packages/agent-mesh/src/agentmesh/governance/audit.py` | Merkle-chained audit log |
-| `packages/agent-sre/src/agent_sre/anomaly/rogue_detector.py` | Rogue agent detector |
+| `getting_started.py` | Real CrewAI-native quickstart using `Agent`, `Task`, `Crew`, and `CrewAIKernel.wrap()` |
+| `requirements.txt` | Minimal example-specific dependency declaration |
+| `crewai_governance_demo.py` | Supplemental simulated CrewAI-style governance showcase |
+| `policies/content_creation_policy.yaml` | Policy data used by the supplemental showcase |
+| `policies/quality_gate_policy.yaml` | Publishing quality gate policy for the supplemental showcase |
 
-## Related
+## Validation
 
-- [Quickstart Examples](../quickstart/) — includes the native `CrewAIKernel` wrapper example
-- [Live Governance Demo](../../demo/) — Full demo with real LLM calls
-- [Sample Policies](../policies/) — Additional YAML governance policies
+Suggested checks from the repo root:
+
+```bash
+python examples/crewai-governed/getting_started.py
+pytest packages/agent-os/tests/test_crewai_logging.py \
+       packages/agent-os/tests/test_crewai_native_runtime.py -q
+```
