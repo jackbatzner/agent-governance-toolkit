@@ -2,11 +2,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
-CrewAI + Governance Toolkit — End-to-End Demo
-==============================================
+CrewAI-style Governance Toolkit — End-to-End Demo
+=================================================
 
-Demonstrates a 4-agent CrewAI content-creation crew operating under
-agent-governance-toolkit policy enforcement with **real LLM calls**.
+Runnable governance showcase for a 4-agent content workflow inspired by
+CrewAI. The governance middleware, audit logging, rogue detection, and
+``crewai-agentmesh`` trust primitives are real; the workflow orchestration is
+simulated and does not instantiate native ``crewai.Agent``, ``Task``, or
+``Crew`` objects.
 
 Nine governance scenarios are exercised end-to-end:
   1. Role-Based Tool Access   — CapabilityGuard limits tools per agent role
@@ -19,10 +22,14 @@ Nine governance scenarios are exercised end-to-end:
   8. Capability Escalation     — Undeclared tool usage detected and blocked
   9. Tamper Detection          — Merkle proof generation and tamper detection
 
-Requires:
-  - OPENAI_API_KEY  or  (AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT)
-    or  GOOGLE_API_KEY / GEMINI_API_KEY
+Run from a repo checkout:
   - pip install agent-governance-toolkit[full]
+
+Optional extras:
+  - pip install crewai-agentmesh        # if you want the trust adapter installed outside the repo
+  - pip install openai                  # for OpenAI / Azure OpenAI live calls
+  - pip install google-generativeai     # for Gemini live calls
+  - Set OPENAI_API_KEY or AZURE_OPENAI_* or GOOGLE_API_KEY / GEMINI_API_KEY
 
 Usage:
   python examples/crewai-governed/crewai_governance_demo.py
@@ -72,22 +79,29 @@ from agent_sre.anomaly.rogue_detector import (
     RiskLevel,
 )
 
-# -- CrewAI trust integration (from crewai-agentmesh package) ---------------
-sys.path.insert(
-    0,
-    str(
-        _REPO_ROOT
-        / "packages"
-        / "agentmesh-integrations"
-        / "crewai-agentmesh"
-    ),
-)
-from crewai_agentmesh.trust import (
-    AgentProfile,
-    CapabilityGate,
-    TrustTracker,
-    TrustedCrew,
-)
+# -- CrewAI trust primitives (prefer installed package, fall back to repo) ---
+try:
+    from crewai_agentmesh.trust import (
+        AgentProfile,
+        CapabilityGate,
+        TrustTracker,
+        TrustedCrew,
+    )
+except ImportError:
+    _LOCAL_CREWAI_AGENTMESH = (
+        _REPO_ROOT / "packages" / "agentmesh-integrations" / "crewai-agentmesh"
+    )
+    if not _LOCAL_CREWAI_AGENTMESH.exists():
+        raise SystemExit(
+            "Install crewai-agentmesh or run this script from a repository checkout."
+        ) from None
+    sys.path.insert(0, str(_LOCAL_CREWAI_AGENTMESH))
+    from crewai_agentmesh.trust import (
+        AgentProfile,
+        CapabilityGate,
+        TrustTracker,
+        TrustedCrew,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -128,8 +142,8 @@ def _banner() -> str:
     return "\n".join(
         [
             f"{C.CYAN}{C.BOLD}{C.BOX_TL}{C.BOX_H * w}{C.BOX_TR}{C.RESET}",
-            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.WHITE}CrewAI + Governance Toolkit — End-to-End Demo{' ' * (w - 48)}{C.CYAN}{C.BOX_V}{C.RESET}",
-            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.DIM}{C.WHITE}4-agent crew · Real policies · Merkle-chained audit{' ' * (w - 54)}{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}",
+            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.WHITE}CrewAI-style Governance Toolkit — Demo{' ' * (w - 43)}{C.CYAN}{C.BOX_V}{C.RESET}",
+            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.DIM}{C.WHITE}4-agent workflow simulation · Real policies · Merkle audit{' ' * (w - 60)}{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}",
             f"{C.CYAN}{C.BOLD}{C.BOX_BL}{C.BOX_H * w}{C.BOX_BR}{C.RESET}",
         ]
     )
@@ -1492,7 +1506,7 @@ def print_audit_summary(audit_log: AuditLog) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(
-        description="CrewAI + Governance Toolkit — End-to-End Demo",
+        description="CrewAI-style Governance Toolkit — End-to-End Demo",
     )
     parser.add_argument(
         "--model",
@@ -1533,7 +1547,7 @@ async def main() -> None:
         f"{C.DIM}Audit:{C.RESET} {C.GREEN}REAL{C.RESET}  {C.DIM}│{C.RESET}  "
         f"{C.DIM}LLM calls:{C.RESET} {llm_label}"
     )
-    print(f"  {C.DIM}Crew: Researcher → Writer → Editor → Publisher{C.RESET}")
+    print(f"  {C.DIM}Workflow: Researcher → Writer → Editor → Publisher{C.RESET}")
     print(
         f"  {C.YELLOW}⚠  Policy:{C.RESET} {C.DIM}SAMPLE CONFIG — review and customize before production use.{C.RESET}"
     )
@@ -1542,7 +1556,7 @@ async def main() -> None:
             f"  {C.YELLOW}ℹ  No API key found — running with simulated LLM responses.{C.RESET}"
         )
         print(
-            f"  {C.DIM}   Set OPENAI_API_KEY, AZURE_OPENAI_API_KEY, or GOOGLE_API_KEY for real calls.{C.RESET}"
+            f"  {C.DIM}   Set OPENAI_API_KEY, AZURE_OPENAI_API_KEY, or GOOGLE_API_KEY for live calls.{C.RESET}"
         )
 
     s1 = await scenario_1_role_based_access(client, model, audit_log, args.verbose)
@@ -1563,7 +1577,7 @@ async def main() -> None:
     line1 = f"  Demo complete -- {total} audit entries across 9 scenarios"
     print(f"{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}{C.GREEN}{line1}{' ' * (w - len(line1))}{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}")
     lines = [
-        "  CrewAI crew: Researcher -> Writer -> Editor -> Publisher",
+        "  Crew-style workflow: Researcher -> Writer -> Editor -> Publisher",
         "  9 scenarios: access, PII, trust, rogue, pipeline,",
         "    injection, delegation, escalation, tamper detection",
         "  Governance intercepted requests BEFORE and AFTER the LLM",

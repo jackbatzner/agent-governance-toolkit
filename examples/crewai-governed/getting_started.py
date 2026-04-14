@@ -1,11 +1,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
-CrewAI + Governance Toolkit — Getting Started
-==============================================
+CrewAI-style Governance Toolkit — Getting Started
+=================================================
 
-Minimal example showing how to add governance to an existing CrewAI
-workflow. Copy this pattern into your own project.
+Minimal governance walkthrough for a CrewAI-style workflow. This script does
+not import or run the ``crewai`` package; it shows the middleware and audit
+pattern you can place around a CrewAI crew or task runner.
+
+Run from a repo checkout:
 
     pip install agent-governance-toolkit[full]
     python examples/crewai-governed/getting_started.py
@@ -13,10 +16,11 @@ workflow. Copy this pattern into your own project.
 What this demonstrates:
   1. Load YAML governance policies
   2. Wire up middleware (policy + capability guard + audit)
-  3. Run agent messages through governance BEFORE calling the LLM
+  3. Run simulated agent messages through governance BEFORE calling the LLM
   4. Verify the tamper-proof audit trail
 
-For the full 9-scenario showcase, run crewai_governance_demo.py instead.
+For a native CrewAI wrapper example, see ``examples/quickstart/crewai_governed.py``.
+For the larger simulated showcase, run ``crewai_governance_demo.py``.
 """
 
 from __future__ import annotations
@@ -25,9 +29,9 @@ import asyncio
 import sys
 from pathlib import Path
 
-# --- Setup: importable from pip install agent-governance-toolkit[full] ---
-# (The sys.path lines below are only needed when running from the repo
-# checkout. With a pip install, just `from agent_os...` works directly.)
+# --- Setup: importable from a repo checkout after installing dependencies ---
+# (The sys.path lines below are only needed when running from the repository.
+# With an editable/local install, `from agent_os...` works directly.)
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-os" / "src"))
 sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-mesh" / "src"))
@@ -65,8 +69,8 @@ researcher_guard = CapabilityGuardMiddleware(
 
 
 # ── Step 3: Minimal context shims ────────────────────────────────────────
-# These adapt your agent's messages to the middleware interface.
-# In production, the toolkit's framework adapters handle this for you.
+# These adapt messages and tool calls to the middleware interface.
+# In production, framework adapters such as CrewAIKernel handle this for you.
 
 class AgentContext:
     """Wraps an agent message for the governance middleware."""
@@ -91,7 +95,7 @@ class ToolContext:
 
 async def main() -> None:
     print("=" * 55)
-    print("  CrewAI + Governance Toolkit — Getting Started")
+    print("  CrewAI-style Governance Toolkit — Getting Started")
     print("=" * 55)
 
     # --- Check 1: Safe message passes policy ---
@@ -99,7 +103,7 @@ async def main() -> None:
     ctx = AgentContext("researcher", "Search for recent AI governance papers")
 
     async def llm_call() -> None:
-        # Replace this with your actual LLM / CrewAI task execution
+        # Replace this with your actual CrewAI task execution or crew kickoff.
         ctx.result = AgentResponse(
             messages=[Message("assistant", ["Here are the top papers..."])]
         )
@@ -143,7 +147,7 @@ async def main() -> None:
     print(f"    {total} audit entries logged")
     print(f"    Merkle chain integrity: {'VERIFIED' if valid else f'FAILED: {err}'}")
 
-    print("\nDone! See crewai_governance_demo.py for the full 9-scenario showcase.")
+    print("\nDone! See crewai_governance_demo.py for the larger simulated showcase.")
 
 
 if __name__ == "__main__":
