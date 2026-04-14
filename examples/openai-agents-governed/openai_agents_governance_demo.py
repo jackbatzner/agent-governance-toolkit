@@ -2,10 +2,15 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
-OpenAI Agents SDK + Governance Toolkit - End-to-End Demo
+OpenAI Agents Governance Pattern Demo
 
-Demonstrates a 4-agent OpenAI Agents SDK pipeline (Researcher -> Writer -> Editor -> Publisher)
-operating under agent-governance-toolkit policy enforcement with real LLM calls.
+Demonstrates a 4-agent workflow shaped like an OpenAI Agents pipeline
+(Researcher -> Writer -> Editor -> Publisher) using agent-governance-toolkit
+middleware and selected trust components from this repo.
+
+This demo is intentionally local and reproducible: it can use real or
+simulated LLM calls, but it does not instantiate `agents.Agent`,
+`InputGuardrail`, or `Runner.run`.
 
 Nine governance scenarios:
   1. Role-Based Tool Access
@@ -39,8 +44,10 @@ from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# Path setup -- only needed when running from the repo checkout.
-# With `pip install agent-governance-toolkit[full]`, skip this block.
+# Path setup for this repo-local demo.
+# The example intentionally imports local packages directly instead of
+# promising that `agent-governance-toolkit[full]` installs every optional
+# OpenAI Agents integration dependency.
 # ---------------------------------------------------------------------------
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-os" / "src"))
@@ -91,7 +98,7 @@ from agent_sre.anomaly.rogue_detector import (
 )
 
 # ---------------------------------------------------------------------------
-# OpenAI Agents Trust imports -- native SDK integration layer
+# openai-agents-trust imports used by this local demo
 # The openai-agents-trust __init__.py imports guardrails.py which requires
 # the OpenAI Agents SDK (`agents` package).  The submodules we need
 # (policy, trust, audit, identity) are self-contained, so we load them
@@ -1850,7 +1857,7 @@ def print_audit_summary(audit_log: AuditLog) -> None:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(
-        description="OpenAI Agents SDK + Governance Toolkit Demo"
+        description="OpenAI Agents governance pattern demo"
     )
     parser.add_argument("--model", type=str, default=None, help="LLM model override")
     parser.add_argument(
@@ -1871,7 +1878,7 @@ async def main() -> None:
     audit_log = AuditLog()
 
     # Banner
-    _banner("OpenAI Agents SDK + Governance Toolkit")
+    _banner("OpenAI Agents Governance Pattern Demo")
     print(f"\n  {C.BOLD}Backend:{C.RESET}     {C.CYAN}{backend}{C.RESET}")
     print(f"  {C.BOLD}Model:{C.RESET}       {C.CYAN}{model}{C.RESET}")
     print(
@@ -1882,7 +1889,9 @@ async def main() -> None:
     print(
         f"  {C.BOLD}Pipeline:{C.RESET}    Researcher -> Writer -> Editor -> Publisher"
     )
-    print(f"  {C.BOLD}SDK:{C.RESET}         OpenAI Agents SDK + openai-agents-trust")
+    print(
+        f"  {C.BOLD}SDK path:{C.RESET}    local middleware demo + repo trust modules"
+    )
 
     s1 = await scenario_1_role_based_access(client, model, audit_log, args.verbose)
     s2 = await scenario_2_data_sharing(client, model, audit_log, args.verbose)
@@ -1921,8 +1930,8 @@ async def main() -> None:
         f"agent behavior"
     )
     print(
-        f"  {C.TREE_B}{C.DASH} OpenAI Agents SDK guardrails integrate "
-        f"natively with governance"
+        f"  {C.TREE_B}{C.DASH} SDK-native guardrails live in "
+        f"openai-agents-trust; this demo stays local"
     )
     print(
         f"  {C.TREE_E}{C.DASH} Merkle-chained audit trail is "

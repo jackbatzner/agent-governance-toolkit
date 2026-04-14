@@ -1,20 +1,25 @@
-# OpenAI Agents SDK + Governance Toolkit — End-to-End Demo
+# OpenAI Agents Governance Pattern Demo
 
-> A 4-agent OpenAI Agents SDK pipeline (Researcher → Writer → Editor
-> → Publisher) operating under **real** agent-governance-toolkit policy
-> enforcement. Every policy decision, tool-access check, trust gate,
-> and rogue detection event is audit-logged in a Merkle-chained,
-> tamper-proof trail.
+> A local, reproducible governance demo for a 4-agent workflow shaped like
+> an OpenAI Agents pipeline (Researcher → Writer → Editor → Publisher).
+> It uses framework-agnostic middleware plus selected trust components from
+> this repo. It does **not** instantiate `agents.Agent`,
+> `InputGuardrail`, or `Runner.run`.
 
-## Quick Start (< 2 minutes)
+If you need a literal OpenAI Agents SDK sample, use:
+
+- `examples/quickstart/openai_agents_governed.py` for a governed `Runner.run` path
+- `packages/agentmesh-integrations/openai-agents-trust/README.md` for real
+  `InputGuardrail` / `OutputGuardrail` / hooks examples
+
+## Local Quick Start (< 2 minutes)
 
 ```bash
-pip install agent-governance-toolkit[full]
 python examples/openai-agents-governed/getting_started.py
 ```
 
 `getting_started.py` is a **~170-line** copy-paste-friendly example showing
-the core integration pattern:
+the local governance pattern used in this folder:
 
 ```python
 from agent_os.policies.evaluator import PolicyEvaluator
@@ -25,7 +30,7 @@ from agent_os.integrations.maf_adapter import (
 )
 from agentmesh.governance.audit import AuditLog
 
-# OpenAI Agents Trust — native SDK integration
+# openai-agents-trust components reused directly in this demo
 from openai_agents_trust.policy import GovernancePolicy
 from openai_agents_trust.trust import TrustScorer
 
@@ -43,7 +48,7 @@ except MiddlewareTermination:
     # Governance blocked the request BEFORE the LLM was called
     pass
 
-# 3. Use openai-agents-trust for trust scoring
+# 3. Use openai-agents-trust components for trust scoring
 scorer = TrustScorer(default_score=0.8)
 if scorer.check_trust("my-agent", min_score=0.6):
     # Agent is trusted enough for this operation
@@ -62,6 +67,18 @@ python examples/openai-agents-governed/openai_agents_governance_demo.py
 
 ## What This Shows
 
+- Honest local demo of governance middleware + trust components
+- Reproducible from a repo checkout, including simulated LLM fallback
+- OpenAI-Agents-shaped roles and handoff logic without claiming a full SDK-native run
+
+## What This Folder Does *Not* Show
+
+- No `agents.Agent`
+- No `InputGuardrail` / `OutputGuardrail`
+- No `Runner.run`
+- No claim that `agent-governance-toolkit[full]` alone installs the
+  optional OpenAI Agents SDK stack
+
 | Scenario | Governance Layer | What Happens |
 |----------|-----------------|--------------|
 | **1. Role-Based Tool Access** | `CapabilityGuardMiddleware` + `TrustedFunctionGuard` | Each agent role has a declared tool allow/deny list — Researcher can `web_search` but not `publish_content`; Writer can `write_draft` but not `shell_exec`. Trust-scored function gating adds per-function thresholds. |
@@ -78,7 +95,7 @@ python examples/openai-agents-governed/openai_agents_governance_demo.py
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  OpenAI Agents SDK Pipeline (4 agents)                          │
+│  OpenAI-style 4-agent workflow                                  │
 │                                                                 │
 │  ┌───────────┐  ┌────────┐  ┌────────┐  ┌───────────┐         │
 │  │ Researcher│→ │ Writer │→ │ Editor │→ │ Publisher │         │
@@ -93,7 +110,7 @@ python examples/openai-agents-governed/openai_agents_governance_demo.py
 │  └──────────────────────┬──────────────────────────────────┘    │
 │                         │                                       │
 │  ┌──────────────────────┴──────────────────────────────────┐    │
-│  │          openai-agents-trust Integration                 │    │
+│  │      selected openai-agents-trust components             │    │
 │  │                                                         │    │
 │  │  TrustedFunctionGuard   (trust-scored tool gating)      │    │
 │  │  HandoffVerifier        (trust-gated agent handoffs)    │    │
@@ -112,20 +129,27 @@ python examples/openai-agents-governed/openai_agents_governance_demo.py
         agentmesh.governance   agent_sre.anomaly
 ```
 
-## Prerequisites
+## Dependencies and Prerequisites
 
 ```bash
-# Install the toolkit
-pip install agent-governance-toolkit[full]
+# This folder is designed to run from a repo checkout.
+# It imports local packages directly via sys.path.
 
 # (Optional) Set an API key for real LLM calls — the demo also works
 # with simulated responses if no key is set.
-export OPENAI_API_KEY="sk-..."
+set OPENAI_API_KEY=sk-...
 # or for Azure OpenAI:
-export AZURE_OPENAI_API_KEY="..."
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+set AZURE_OPENAI_API_KEY=...
+set AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 # or for Google Gemini:
-export GOOGLE_API_KEY="..."
+set GOOGLE_API_KEY=...
+```
+
+For literal OpenAI Agents SDK examples elsewhere in the repo, install the
+SDK-native dependencies explicitly:
+
+```bash
+pip install agent-governance-toolkit[full] openai-agents openai-agents-trust
 ```
 
 ## Running
@@ -211,7 +235,7 @@ All attacks are caught **before** the LLM is invoked.
 
 ### 7. Handoff Governance (Trust-Gated Handoffs)
 
-Unique to OpenAI Agents SDK — enforces trust at agent-to-agent handoffs:
+Inspired by OpenAI Agents-style handoffs — enforces trust at agent-to-agent handoffs:
 
 | Handoff | Source Trust | Target Trust | Result |
 |---------|-------------|-------------|--------|
@@ -255,17 +279,20 @@ Demonstrates the cryptographic integrity guarantees of the audit trail:
 | `packages/agent-mesh/src/agentmesh/governance/audit.py` | Merkle-chained audit log |
 | `packages/agent-sre/src/agent_sre/anomaly/rogue_detector.py` | Rogue agent detector |
 
-## OpenAI Agents SDK Integration Points
+## Relationship to the OpenAI Agents SDK
 
-The demo showcases two integration approaches:
+This folder intentionally showcases only one approach:
 
 ### Approach 1: Governance Middleware (framework-agnostic)
 The core governance middleware (`GovernancePolicyMiddleware`, `CapabilityGuardMiddleware`,
 `RogueDetectionMiddleware`) works with any agent framework. Wrap your LLM calls with
 middleware `process()` to enforce governance before/after each call.
 
-### Approach 2: Native SDK Integration (openai-agents-trust)
-The `openai-agents-trust` package provides SDK-native constructs:
+The folder also reuses a few standalone pieces from `openai-agents-trust`
+(`GovernancePolicy`, `TrustScorer`, `AuditLog`, `AgentIdentity`) without
+loading the SDK-bound guardrail entrypoints.
+
+For native SDK integration, the `openai-agents-trust` package provides:
 - **Guardrails** — `trust_input_guardrail`, `policy_input_guardrail`, `content_output_guardrail`
 - **Hooks** — `GovernanceHooks` for lifecycle instrumentation
 - **Handoffs** — `trust_gated_handoff` for trust-scored agent delegation
