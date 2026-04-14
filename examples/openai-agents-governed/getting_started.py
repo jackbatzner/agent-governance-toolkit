@@ -2,23 +2,31 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
-OpenAI Agents SDK + Governance Toolkit — Getting Started
-========================================================
+OpenAI Governance Toolkit — Getting Started
+===========================================
 
-Minimal example showing how to add governance to an existing OpenAI
-Agents SDK workflow. Copy this pattern into your own project.
+Minimal repo-local example showing how to layer governance onto an
+OpenAI-Agents-style workflow.
 
-    pip install agent-governance-toolkit[full]
     python examples/openai-agents-governed/getting_started.py
+
+Honesty note:
+  - This script does NOT instantiate `agents.Agent`, `InputGuardrail`,
+    or `Runner.run`.
+  - Instead, it exercises the toolkit middleware directly and loads the
+    trust/policy primitives from `openai_agents_trust` out of this repo
+    checkout so the example remains runnable without the OpenAI Agents SDK.
 
 What this demonstrates:
   1. Load YAML governance policies
   2. Wire up middleware (policy + capability guard + audit)
   3. Run agent messages through governance BEFORE calling the LLM
-  4. Use openai-agents-trust guardrails and trust scoring
+  4. Use openai-agents-trust trust and policy primitives
   5. Verify the tamper-proof audit trail
 
 For the full 9-scenario showcase, run openai_agents_governance_demo.py instead.
+For SDK-native guardrails and `Runner.run` patterns, see the README in this
+directory.
 """
 
 from __future__ import annotations
@@ -27,9 +35,10 @@ import asyncio
 import sys
 from pathlib import Path
 
-# --- Setup: importable from pip install agent-governance-toolkit[full] ---
-# (The sys.path lines below are only needed when running from the repo
-# checkout. With a pip install, just `from agent_os...` works directly.)
+# --- Repo-local setup ---
+# This example is intended to run from a repo checkout. The sys.path lines
+# below make sibling packages importable without pretending that a single
+# published extra installs the full OpenAI example surface.
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-os" / "src"))
 sys.path.insert(0, str(_REPO_ROOT / "packages" / "agent-mesh" / "src"))
@@ -63,9 +72,10 @@ from agent_os.integrations.maf_adapter import (
 )
 from agentmesh.governance.audit import AuditLog
 
-# OpenAI Agents Trust — native SDK integration layer
-# Load submodules directly to avoid triggering __init__.py which requires
-# the OpenAI Agents SDK (`agents` package).
+# OpenAI Agents Trust primitives — loaded directly from the repo checkout.
+# We avoid importing openai_agents_trust.__init__ here because that pulls in
+# the OpenAI Agents SDK (`agents` package), and this script is intentionally a
+# runnable primitive demo rather than a native Runner.run example.
 import importlib.util as _ilu
 
 def _load_submodule(pkg_dir: str, name: str):
@@ -107,7 +117,7 @@ policy_middleware = GovernancePolicyMiddleware(
 )
 
 # ── Step 2: Set up capability guard per agent role ───────────────────────
-# This mirrors the OpenAI Agents SDK tool definitions.
+# This mirrors an OpenAI-Agents-style tool definition set.
 # allowed_tools = what the agent CAN use; denied_tools = hard blocks.
 
 researcher_guard = CapabilityGuardMiddleware(
@@ -155,7 +165,7 @@ class ToolContext:
 
 async def main() -> None:
     print("=" * 60)
-    print("  OpenAI Agents SDK + Governance Toolkit — Getting Started")
+    print("  OpenAI Governance Toolkit — Getting Started")
     print("=" * 60)
 
     # --- Check 1: Safe message passes policy ---
