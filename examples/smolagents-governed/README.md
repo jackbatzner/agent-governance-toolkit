@@ -1,53 +1,56 @@
-# 🤗 Hugging Face smolagents Governance Patterns Demo
+# 🤗 Hugging Face smolagents + Governance Toolkit
 
-> A 4-role governance walkthrough shaped like a smolagents research
-> crew. This example uses **real** agent-governance-toolkit policy
-> enforcement, rogue detection, and Merkle-chained audit logging, but
-> it does **not** instantiate `smolagents` agents directly.
+> This folder now includes a **real smolagents integration path** for
+> the core example plus the earlier simulated governance walkthroughs.
+> `getting_started.py` uses actual `smolagents` runtime objects;
+> `demo_simulated.py` and `smolagents_governance_demo.py` stay focused on
+> broader toolkit behavior.
 
 ![smolagents governance demo](demo.gif)
 
-## Quick Start (< 2 minutes)
+## Two Ways to Run
 
 ```bash
-pip install agent-governance-toolkit[full]
+# Real smolagents runtime example
+pip install smolagents agent-governance-toolkit[full]
 python examples/smolagents-governed/getting_started.py
+
+# Or keep the old no-framework walkthrough
+python examples/smolagents-governed/demo_simulated.py
 ```
 
-`getting_started.py` is a **~150-line** copy-paste-friendly example showing
-the core governance pattern for a smolagents-shaped workflow:
+`getting_started.py` is the real integration example. It uses:
+
+- real `@tool`-decorated smolagents tools
+- a real `ToolCallingAgent`
+- `agent_os.integrations.smolagents_adapter.SmolagentsKernel`
+- a deterministic local `Model`, so the example runs without API keys
+
+The key integration surface is the adapter wrapping real smolagents tools:
 
 ```python
-from agent_os.policies.evaluator import PolicyEvaluator
-from agent_os.integrations.maf_adapter import (
-    GovernancePolicyMiddleware,
-    CapabilityGuardMiddleware,
-    MiddlewareTermination,
-)
-from agentmesh.governance.audit import AuditLog
+from smolagents import ToolCallingAgent, tool
+from agent_os.integrations.smolagents_adapter import SmolagentsKernel
 
-# 1. Load YAML policies and set up middleware
-audit_log = AuditLog()
-evaluator = PolicyEvaluator()
-evaluator.load_policies(Path("./policies"))
-middleware = GovernancePolicyMiddleware(evaluator=evaluator, audit_log=audit_log)
+@tool
+def web_search(query: str) -> str:
+    """Search public sources."""
+    return f"Results for: {query}"
 
-# 2. Wrap your agent's LLM calls with governance
-try:
-    await middleware.process(agent_context, your_llm_call)
-    # LLM call succeeded — governance approved
-except MiddlewareTermination:
-    # Governance blocked the request BEFORE the LLM was called
-    pass
+agent = ToolCallingAgent(tools=[web_search], model=your_model)
+kernel = SmolagentsKernel(allowed_tools=["web_search"], blocked_tools=["shell_exec"])
+kernel.wrap(agent)
 
-# 3. Verify the tamper-proof audit trail
-valid, err = audit_log.verify_integrity()
+result = agent.run("Research public agent governance patterns.")
 ```
 
-For the full **9-scenario showcase** (prompt injection, rogue detection,
-tamper detection, etc.), run the comprehensive demo:
+For the broader simulated governance walkthroughs:
 
 ```bash
+# Legacy no-framework walkthrough
+python examples/smolagents-governed/demo_simulated.py
+
+# Full 9-scenario governance walkthrough (still simulated/smolagents-shaped)
 python examples/smolagents-governed/smolagents_governance_demo.py
 ```
 
@@ -97,64 +100,54 @@ python examples/smolagents-governed/smolagents_governance_demo.py
 
 Hugging Face [smolagents](https://github.com/huggingface/smolagents) provides
 two agent types — `CodeAgent` (generates Python code to call tools) and
-`ToolCallingAgent` (emits structured JSON tool calls). This folder does not
-instantiate those runtime objects directly; it uses lighter local shims so the
-governance behavior stays easy to run and reproduce.
+`ToolCallingAgent` (emits structured JSON tool calls). The files in this folder
+are now split deliberately:
 
-This repository also includes a real `SmolagentsKernel` in
-`agent_os.integrations.smolagents_adapter` for live tool wrapping. The
-example in this folder stays smaller on purpose: it exercises the same
-governance layers with lightweight role/tool shims so you can review the
-policy behavior without needing a live smolagents runtime.
+1. **`getting_started.py`** uses the real `ToolCallingAgent` runtime, real
+   `@tool` objects, and the toolkit's `SmolagentsKernel`.
+2. **`demo_simulated.py`** preserves the previous lightweight walkthrough
+   without a smolagents dependency.
+3. **`smolagents_governance_demo.py`** remains the larger simulated showcase
+   for policy, rogue detection, and audit scenarios beyond the current native
+   smolagents adapter surface.
 
-1. **Tool `forward()` wrapping** — The `SmolagentsKernel` from
-   `agent_os.integrations.smolagents_adapter` wraps each tool's `forward`
-   method with governance checks (allow/deny list, content filtering,
-   budget tracking).
+The native adapter currently intercepts **tool execution** by wrapping each
+tool's `forward()` implementation on real smolagents agents:
 
-2. **Policy middleware** — Before any LLM call, the `GovernancePolicyMiddleware`
-   evaluates the agent's message against YAML policy rules. Violations are
-   caught before tokens are spent.
+1. **Tool `forward()` wrapping** — `SmolagentsKernel` wraps entries from the
+   agent's real tool registry and enforces allowlists, blocklists, blocked
+   content patterns, approval gates, and audit events.
 
-3. **Rogue detection** — The `RogueAgentDetector` monitors behavioral signals
-   (call frequency, action entropy, capability deviation) to catch compromised
-   or malfunctioning agents.
+2. **Simulated higher-level policy walkthroughs** — The other scripts in this
+   folder still demonstrate the broader toolkit layers that are not yet wired
+   into a native smolagents message-level integration.
 
 ## Prerequisites
 
 ```bash
-# Install the toolkit
-pip install agent-governance-toolkit[full]
+# Minimal dependency for the real smolagents example
+pip install smolagents agent-governance-toolkit[full]
 
-# Optional: only needed if you want to experiment with the live
-# smolagents adapter surface in agent_os.integrations.smolagents_adapter
-pip install smolagents
-
-# Optional: set an API key if you want live LLM responses.
-# The governance walkthrough still runs with simulated responses if no key is set.
-export GITHUB_TOKEN=$(gh auth token)    # Free via GitHub Models
-# or:
-export OPENAI_API_KEY="sk-..."
-# or for Azure OpenAI:
-export AZURE_OPENAI_API_KEY="..."
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
-# or for Google Gemini:
-export GOOGLE_API_KEY="..."
+# Or install just the framework dependency from this folder
+pip install -r examples/smolagents-governed/requirements.txt
 ```
+
+`getting_started.py` does **not** need an API key: it uses a deterministic
+local demo model to drive the real smolagents runtime.
 
 ## Running
 
 ```bash
 cd agent-governance-toolkit
 
-# Default (auto-detects backend, falls back to simulated responses)
+# Real smolagents example (actual ToolCallingAgent + @tool + adapter)
+python examples/smolagents-governed/getting_started.py
+
+# Previous lightweight walkthrough without smolagents
+python examples/smolagents-governed/demo_simulated.py
+
+# Larger simulated governance showcase
 python examples/smolagents-governed/smolagents_governance_demo.py
-
-# Use a specific model
-python examples/smolagents-governed/smolagents_governance_demo.py --model gpt-4o
-
-# Show raw LLM responses
-python examples/smolagents-governed/smolagents_governance_demo.py --verbose
 ```
 
 ## Scenarios Walkthrough
@@ -243,11 +236,13 @@ Demonstrates the cryptographic integrity guarantees of the audit trail:
 
 | File | Purpose |
 |------|---------|
-| `getting_started.py` | **Start here** — minimal governance walkthrough for smolagents-style roles |
-| `smolagents_governance_demo.py` | Full 9-scenario governance walkthrough |
+| `getting_started.py` | **Start here** — real smolagents `ToolCallingAgent` + `SmolagentsKernel` integration |
+| `demo_simulated.py` | Previous lightweight walkthrough with no smolagents dependency |
+| `smolagents_governance_demo.py` | Full 9-scenario simulated governance walkthrough |
+| `requirements.txt` | Minimal framework dependency for the real example |
 | `policies/research_governance_policy.yaml` | Role-based + PII + injection + delegation policies |
 | `policies/model_safety_policy.yaml` | Model trust and publishing quality gates |
-| `packages/agent-os/src/agent_os/integrations/smolagents_adapter.py` | Real smolagents adapter surface for live tool wrapping |
+| `packages/agent-os/src/agent_os/integrations/smolagents_adapter.py` | Real smolagents adapter used by `getting_started.py` |
 | `packages/agent-mesh/src/agentmesh/governance/audit.py` | Merkle-chained audit log |
 | `packages/agent-sre/src/agent_sre/anomaly/rogue_detector.py` | Rogue agent detector |
 

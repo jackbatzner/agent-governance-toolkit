@@ -45,6 +45,7 @@ from typing import Any, Callable
 from .base import BaseIntegration, GovernancePolicy
 
 logger = logging.getLogger(__name__)
+_INTERNAL_TOOL_NAMES = {"final_answer"}
 
 # Graceful import of smolagents
 try:
@@ -229,19 +230,34 @@ class SmolagentsKernel(BaseIntegration):
     def _get_tools(agent: Any) -> dict[str, Any]:
         """Extract the tool dict from a smolagents agent.
 
-        smolagents agents expose tools via ``agent.toolbox`` which may be
-        a ``Toolbox`` object (with a ``.tools`` dict) or a plain dict.
-        Falls back to an empty dict when no toolbox is found.
+        Current smolagents agents expose tools via ``agent.tools``.
+        Older/toolbox-shaped objects may expose ``agent.toolbox`` with a
+        ``.tools`` dict or a plain dict. Internal control tools such as
+        ``final_answer`` are excluded from governance wrapping.
         """
+        direct_tools = getattr(agent, "tools", None)
+        if isinstance(direct_tools, dict):
+            return {
+                tool_name: tool_obj
+                for tool_name, tool_obj in direct_tools.items()
+                if tool_name not in _INTERNAL_TOOL_NAMES
+            }
+
         toolbox = getattr(agent, "toolbox", None)
         if toolbox is None:
             return {}
-        # Toolbox object has a .tools dict
         if hasattr(toolbox, "tools"):
-            return toolbox.tools
-        # Plain dict
+            return {
+                tool_name: tool_obj
+                for tool_name, tool_obj in toolbox.tools.items()
+                if tool_name not in _INTERNAL_TOOL_NAMES
+            }
         if isinstance(toolbox, dict):
-            return toolbox
+            return {
+                tool_name: tool_obj
+                for tool_name, tool_obj in toolbox.items()
+                if tool_name not in _INTERNAL_TOOL_NAMES
+            }
         return {}
 
     def _wrap_tool(self, tool: Any, tool_name: str, agent_name: str) -> None:
