@@ -1,1 +1,3 @@
+# Example-only dependency list for the real smolagents getting_started.py demo.
+# Use the repo's broader extras when you want the full toolkit experience.
 smolagents>=1.24.0,<2.0
