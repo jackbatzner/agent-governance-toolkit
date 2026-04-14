@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
+# ruff: noqa: E402
 """
-Hugging Face smolagents + Governance Toolkit — End-to-End Demo
-==============================================================
+Hugging Face smolagents Governance Patterns Demo
+================================================
 
-Demonstrates a 4-agent smolagents research crew operating under
-agent-governance-toolkit policy enforcement with **real LLM calls**.
+Demonstrates a 4-role governance walkthrough shaped like a
+smolagents research crew.
+
+This example uses real agent-governance-toolkit middleware,
+policies, rogue detection, and audit logging, but it does not
+instantiate ``smolagents`` agents directly. LLM responses may be
+live or simulated depending on your environment.
 
 Nine governance scenarios are exercised end-to-end:
   1. Role-Based Tool Access   — CapabilityGuard limits tools per agent role
   2. Data-Sharing Policies    — YAML policy blocks PII and internal access
   3. Model Safety Gates       — Restrict model downloads and inference trust
-  4. Rate Limiting / Rogue    — Burst detection triggers quarantine
+  4. Rate Limiting / Rogue    — Deterministic burst detection triggers quarantine
   5. Full Agent Pipeline      — Research → Analyze → Summarize → Publish
   6. Prompt Injection Defense  — Adversarial attacks blocked by policy
   7. Delegation Governance     — Unauthorized pipeline bypasses caught
@@ -20,9 +26,10 @@ Nine governance scenarios are exercised end-to-end:
   9. Tamper Detection          — Merkle proof generation and tamper detection
 
 Requires:
-  - OPENAI_API_KEY  or  (AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT)
-    or  GOOGLE_API_KEY / GEMINI_API_KEY  or  GITHUB_TOKEN
   - pip install agent-governance-toolkit[full]
+  - Optional for live LLM responses:
+      OPENAI_API_KEY  or  (AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT)
+      or  GOOGLE_API_KEY / GEMINI_API_KEY  or  GITHUB_TOKEN
 
 Usage:
   python examples/smolagents-governed/smolagents_governance_demo.py
@@ -72,6 +79,7 @@ from agent_os.integrations.maf_adapter import (
 from agentmesh.governance.audit import AuditLog
 from agent_sre.anomaly.rogue_detector import (
     RogueAgentDetector,
+    RogueAssessment,
     RogueDetectorConfig,
     RiskLevel,
 )
@@ -116,7 +124,7 @@ def _banner() -> str:
         [
             f"{C.CYAN}{C.BOLD}{C.BOX_TL}{C.BOX_H * w}{C.BOX_TR}{C.RESET}",
             f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.WHITE}🤗 smolagents + Governance Toolkit — End-to-End Demo{' ' * (w - 54)}{C.CYAN}{C.BOX_V}{C.RESET}",
-            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.DIM}{C.WHITE}4-agent crew · Real policies · Merkle-chained audit{' ' * (w - 54)}{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}",
+            f"{C.CYAN}{C.BOLD}{C.BOX_V}  {C.DIM}{C.WHITE}4-role simulation · Real policies · Merkle-chained audit{' ' * (w - 59)}{C.CYAN}{C.BOLD}{C.BOX_V}{C.RESET}",
             f"{C.CYAN}{C.BOLD}{C.BOX_BL}{C.BOX_H * w}{C.BOX_BR}{C.RESET}",
         ]
     )
@@ -325,6 +333,8 @@ def _setup_governance() -> tuple[
         capability_violation_weight=0.3,
     )
     rogue_detector = RogueAgentDetector(config=rogue_config)
+    for agent_name, guard in guards.items():
+        rogue_detector.register_capability_profile(agent_name, list(guard.allowed_tools))
     rogue_mw = RogueDetectionMiddleware(
         detector=rogue_detector, agent_id="data_analyst", audit_log=audit_log,
     )
@@ -362,10 +372,10 @@ class ToolContext:
 
 
 async def scenario_1(guards: dict[str, CapabilityGuardMiddleware], verbose: bool) -> tuple[int, int]:
-    """Role-based tool access control for smolagents agents."""
+    """Role-based tool access control for the walkthrough's agent-like roles."""
     print(_section("Scenario 1: Role-Based Tool Access"))
 
-    print(f"  {C.DIM}Each smolagents agent (CodeAgent / ToolCallingAgent) has a"
+    print(f"  {C.DIM}Each role in this walkthrough has a"
           f"  declared tool profile. The CapabilityGuardMiddleware enforces"
           f"  tool access at runtime.{C.RESET}\n")
 
@@ -488,8 +498,8 @@ async def scenario_3(
     """Model safety gates — restrict model downloads and inference trust."""
     print(_section("Scenario 3: Model Safety Gates"))
 
-    print(f"  {C.DIM}smolagents can download and run models from the Hub."
-          f"  Governance ensures only trusted sources and reviewed"
+    print(f"  {C.DIM}In a live smolagents integration, governance can"
+          f"  restrict model sources and require reviewed"
           f"  outputs are used.{C.RESET}\n")
 
     test_cases = [
@@ -544,21 +554,32 @@ async def scenario_4(
 
     agent_name = "data_analyst"
 
-    # Establish a baseline with normal behaviour
-    print(f"  {C.DIM}Establishing baseline behaviour...{C.RESET}")
-    for i in range(5):
-        rogue_detector.record_action(agent_name, f"compute_stats_{i}", "compute_stats")
-        await asyncio.sleep(0.01)
+    # Establish a deterministic multi-window baseline so the follow-up burst
+    # produces a reproducible frequency anomaly in local runs.
+    print(f"  {C.DIM}Establishing deterministic baseline behaviour...{C.RESET}")
+    now = time.time()
+    baseline_counts = [1, 2, 1, 2, 1]
+    for window_index, count in enumerate(baseline_counts):
+        bucket_ts = now - (len(baseline_counts) - window_index) * 61
+        for sample_index in range(count):
+            rogue_detector.record_action(
+                agent_name,
+                f"baseline_{window_index}_{sample_index}",
+                "compute_stats",
+                timestamp=bucket_ts,
+            )
 
-    assessment = rogue_detector.assess(agent_name)
+    rogue_detector.record_action(agent_name, "baseline_current", "compute_stats", timestamp=now)
+
+    assessment = rogue_detector.assess(agent_name, timestamp=now)
     print(_tree("📊", C.GREEN, "Baseline", f"risk={C.GREEN}{assessment.risk_level.name}{C.RESET}"))
 
     # Simulate a burst
     print(f"\n  {C.DIM}Simulating 50-call burst...{C.RESET}")
     for i in range(50):
-        rogue_detector.record_action(agent_name, "compute_stats", "compute_stats")
+        rogue_detector.record_action(agent_name, f"burst_{i}", "compute_stats", timestamp=now)
 
-    assessment = rogue_detector.assess(agent_name)
+    assessment = rogue_detector.assess(agent_name, timestamp=now)
     risk_color = C.RED if assessment.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL) else C.YELLOW
     print(_tree("🚨", risk_color, "After burst", f"risk={risk_color}{assessment.risk_level.name}{C.RESET}"))
     print(_tree("📈", C.CYAN, "Frequency Z-score", f"{assessment.frequency_score:.2f}"))
@@ -587,7 +608,7 @@ async def scenario_5(
     """Full 4-agent pipeline: Research → Analyze → Summarize → Publish."""
     print(_section("Scenario 5: Full Agent Pipeline"))
 
-    print(f"  {C.DIM}Runs the complete smolagents workflow with governance")
+    print(f"  {C.DIM}Runs the complete 4-role workflow with governance")
     print(f"  applied at every step.{C.RESET}\n")
 
     pipeline = [
@@ -874,6 +895,10 @@ async def _run(args: argparse.Namespace) -> None:
         print(f"  {C.DIM}Model: {model}{C.RESET}")
     else:
         print(f"  {C.DIM}(Governance is REAL — only LLM responses are simulated){C.RESET}")
+    print(
+        f"  {C.DIM}(This walkthrough uses lightweight role/tool shims; "
+        f"see agent_os.integrations.smolagents_adapter for live smolagents wrapping){C.RESET}"
+    )
 
     # Setup governance
     evaluator, policy_mw, guards, rogue_mw, audit_log, rogue_detector = _setup_governance()

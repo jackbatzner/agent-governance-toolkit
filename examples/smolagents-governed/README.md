@@ -1,9 +1,9 @@
 # 🤗 Hugging Face smolagents + Governance Toolkit — End-to-End Demo
 
-> A 4-agent smolagents research crew operating under **real**
-> agent-governance-toolkit policy enforcement. Every policy decision,
-> tool-access check, trust gate, and rogue detection event is
-> audit-logged in a Merkle-chained, tamper-proof trail.
+> A 4-role governance walkthrough shaped like a smolagents research
+> crew. This example uses **real** agent-governance-toolkit policy
+> enforcement, rogue detection, and Merkle-chained audit logging, but
+> it does **not** instantiate `smolagents` agents directly.
 
 ![smolagents governance demo](demo.gif)
 
@@ -58,18 +58,18 @@ python examples/smolagents-governed/smolagents_governance_demo.py
 | **1. Role-Based Tool Access** | `CapabilityGuardMiddleware` | Each agent role (Researcher, Analyst, Summarizer, Publisher) has a declared tool allow/deny list — Researcher can `web_search` but not `deploy_model`; Analyst can `compute_stats` but not `shell_exec` |
 | **2. Data-Sharing Policies** | `GovernancePolicyMiddleware` | YAML policy blocks PII (email, phone, SSN), internal resource access, and secrets — **before the LLM is called** |
 | **3. Model Safety Gates** | `GovernancePolicyMiddleware` | Restricts model downloads to trusted sources, blocks arbitrary code execution, requires review before publishing results |
-| **4. Rate Limiting & Rogue Detection** | `RogueDetectionMiddleware` | Behavioral anomaly engine detects a 50-call burst from the Analyst agent and auto-quarantines |
+| **4. Rate Limiting & Rogue Detection** | `RogueDetectionMiddleware` + `RogueAgentDetector` | Behavioral anomaly engine builds a deterministic baseline, then detects a 50-call burst from the Analyst role and recommends quarantine |
 | **5. Full Agent Pipeline** | All layers combined | Research → Analyze → Summarize → Publish pipeline with governance applied at every step |
 | **6. Prompt Injection Defense** | `GovernancePolicyMiddleware` | 8 adversarial attacks (jailbreak, instruction override, system prompt extraction, encoded payload, PII exfiltration, SQL/shell injection) — blocked before reaching the LLM |
 | **7. Delegation Governance** | `GovernancePolicyMiddleware` | Agents trying to bypass the required review pipeline are caught — proper Researcher→Analyst→Summarizer→Publisher chain enforced |
-| **8. Capability Escalation** | `CapabilityGuardMiddleware` + `RogueAgentDetector` | Analyst attempts `shell_exec`, `deploy_model`, `delete_file`, `send_email`, `admin_panel` — all blocked, rogue score escalates |
+| **8. Capability Escalation** | `CapabilityGuardMiddleware` + `RogueAgentDetector` | Analyst attempts `shell_exec`, `deploy_model`, `delete_file`, `send_email`, `admin_panel` — all blocked and recorded against the declared capability profile |
 | **9. Tamper Detection** | `AuditLog` + `MerkleAuditChain` | Merkle proof generation, simulated audit trail tampering caught by integrity check, CloudEvents export |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  smolagents Crew (4 agents)                                 │
+│  smolagents-shaped Roles (4)                                │
 │                                                             │
 │  ┌────────────┐ ┌──────────┐ ┌────────────┐ ┌───────────┐ │
 │  │ Researcher │→│ Analyst  │→│ Summarizer │→│ Publisher │ │
@@ -83,7 +83,7 @@ python examples/smolagents-governed/smolagents_governance_demo.py
 │  │  RogueDetectionMiddleware   (anomaly scoring)          │ │
 │  └──────────────────────┬─────────────────────────────────┘ │
 │                         │                                   │
-│              LLM / Tool Execution (real or simulated)       │
+│          LLM / Tool Execution (live or simulated)           │
 └─────────────────────────┬───────────────────────────────────┘
                           │
               ┌───────────┴───────────┐
@@ -99,6 +99,12 @@ Hugging Face [smolagents](https://github.com/huggingface/smolagents) provides
 two agent types — `CodeAgent` (generates Python code to call tools) and
 `ToolCallingAgent` (emits structured JSON tool calls). The governance toolkit
 intercepts at three points:
+
+This repository also includes a real `SmolagentsKernel` in
+`agent_os.integrations.smolagents_adapter` for live tool wrapping. The
+example in this folder stays smaller on purpose: it exercises the same
+governance layers with lightweight role/tool shims so you can review the
+policy behavior without needing a live smolagents runtime.
 
 1. **Tool `forward()` wrapping** — The `SmolagentsKernel` from
    `agent_os.integrations.smolagents_adapter` wraps each tool's `forward`
@@ -119,8 +125,8 @@ intercepts at three points:
 # Install the toolkit
 pip install agent-governance-toolkit[full]
 
-# (Optional) Set an API key for real LLM calls — the demo also works
-# with simulated responses if no key is set.
+# Optional: set an API key if you want live LLM responses.
+# The governance walkthrough still runs with simulated responses if no key is set.
 export GITHUB_TOKEN=$(gh auth token)    # Free via GitHub Models
 # or:
 export OPENAI_API_KEY="sk-..."
@@ -136,7 +142,7 @@ export GOOGLE_API_KEY="..."
 ```bash
 cd agent-governance-toolkit
 
-# Default (auto-detects backend, falls back to simulated)
+# Default (auto-detects backend, falls back to simulated responses)
 python examples/smolagents-governed/smolagents_governance_demo.py
 
 # Use a specific model
@@ -183,7 +189,9 @@ The `RogueAgentDetector` monitors three behavioral signals:
 - **Entropy** — deviation from normal action distribution
 - **Capability** — calls outside declared tool profile
 
-A 50-call burst triggers HIGH risk and automatic quarantine.
+The demo seeds a deterministic five-window baseline, then injects a 50-call
+burst so the detector produces a reproducible high-risk assessment with
+quarantine recommended.
 
 ### 5. Full Agent Pipeline
 
@@ -214,7 +222,7 @@ Enforces proper workflow delegation chains:
 Detects agents attempting to use tools outside their declared profile:
 - Analyst tries `shell_exec`, `deploy_model`, `delete_file`, `send_email`, `admin_panel`
 - All escalation attempts blocked by `CapabilityGuardMiddleware`
-- `RogueAgentDetector` scores the agent risk after repeated violations
+- `RogueAgentDetector` records those attempts against the analyst's declared tool profile
 
 ### 9. Tamper Detection & Merkle Proofs
 
@@ -230,11 +238,11 @@ Demonstrates the cryptographic integrity guarantees of the audit trail:
 
 | File | Purpose |
 |------|---------|
-| `getting_started.py` | **Start here** — minimal integration example (~120 lines) |
-| `smolagents_governance_demo.py` | Full 9-scenario showcase |
+| `getting_started.py` | **Start here** — minimal governance walkthrough for smolagents-style roles |
+| `smolagents_governance_demo.py` | Full 9-scenario governance walkthrough |
 | `policies/research_governance_policy.yaml` | Role-based + PII + injection + delegation policies |
 | `policies/model_safety_policy.yaml` | Model trust and publishing quality gates |
-| `packages/agent-os/src/agent_os/integrations/smolagents_adapter.py` | smolagents governance kernel |
+| `packages/agent-os/src/agent_os/integrations/smolagents_adapter.py` | Real smolagents adapter surface for live tool wrapping |
 | `packages/agent-mesh/src/agentmesh/governance/audit.py` | Merkle-chained audit log |
 | `packages/agent-sre/src/agent_sre/anomaly/rogue_detector.py` | Rogue agent detector |
 

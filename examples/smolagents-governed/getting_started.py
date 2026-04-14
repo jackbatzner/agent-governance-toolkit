@@ -1,11 +1,15 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
+# ruff: noqa: E402
 """
 Hugging Face smolagents + Governance Toolkit — Getting Started
 ==============================================================
 
-Minimal example showing how to add governance to an existing
-smolagents workflow.  Copy this pattern into your own project.
+Minimal example showing the governance building blocks you would
+apply to a smolagents-style workflow. This script does not import
+or instantiate ``smolagents`` directly; it demonstrates the policy,
+capability, and audit primitives that the real adapter can wrap in
+live integrations. Copy this pattern into your own project.
 
     pip install agent-governance-toolkit[full]
     python examples/smolagents-governed/getting_started.py
@@ -54,7 +58,7 @@ policy_middleware = GovernancePolicyMiddleware(
 )
 
 # ── Step 2: Set up capability guard per agent role ───────────────────────
-# This is the equivalent of declaring tools on a smolagents Agent.
+# This mirrors the tool profile you would declare on a live agent.
 # allowed_tools = what the agent CAN use; denied_tools = hard blocks.
 
 researcher_guard = CapabilityGuardMiddleware(
@@ -65,7 +69,7 @@ researcher_guard = CapabilityGuardMiddleware(
 
 
 # ── Step 3: Minimal context shims ────────────────────────────────────────
-# These adapt your agent's messages to the middleware interface.
+# These adapt the demo's agent-shaped messages to the middleware interface.
 # In production, the toolkit's framework adapters handle this for you.
 
 class AgentContext:
@@ -142,7 +146,7 @@ async def main() -> None:
     print(f"    {total} audit entries logged")
     print(f"    Merkle chain integrity: {'✅ VERIFIED' if valid else f'FAILED: {err}'}")
 
-    print("\nDone! See smolagents_governance_demo.py for the full 9-scenario showcase.")
+    print("\nDone! See smolagents_governance_demo.py for the full 9-scenario governance walkthrough.")
 
 
 if __name__ == "__main__":
