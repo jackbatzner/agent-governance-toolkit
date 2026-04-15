@@ -358,6 +358,12 @@ stages:
         pool:
           vmImage: windows-latest  # ESRP Code Signing requires Windows agent
         steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '${{ parameters.dotnetVersion }}'
+            displayName: 'Use .NET SDK ${{ parameters.dotnetVersion }}'
+
           - task: DownloadPipelineArtifact@2
             inputs:
               artifact: 'nuget-unsigned'
