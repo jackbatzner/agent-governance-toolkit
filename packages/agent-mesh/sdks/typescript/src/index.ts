@@ -85,3 +85,24 @@ export {
   McpScanLabel,
 } from './mcp/metrics';
 export type { McpMetricsSnapshot } from './mcp/metrics';
+
+// Security scanner (full parity — 7 threat types)
+export {
+  McpSecurityScanner as McpSecurityScannerV2,
+  McpThreatType as McpThreatTypeV2,
+  McpSeverity,
+} from './mcp/security';
+export type {
+  McpThreat as McpThreatV2,
+  McpScanResult as McpScanResultV2,
+  McpToolDefinition as McpToolDefinitionV2,
+  McpToolFingerprint,
+} from './mcp/security';
+
+// Session authentication
+export { McpSessionAuthenticator } from './mcp/session';
+export type { McpSession } from './mcp/session';
+
+// Message signing
+export { McpMessageSigner } from './mcp/signing';
+export type { McpSignedMessage, McpVerificationResult } from './mcp/signing';
