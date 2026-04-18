@@ -106,3 +106,11 @@ export type { McpSession } from './mcp/session';
 // Message signing
 export { McpMessageSigner } from './mcp/signing';
 export type { McpSignedMessage, McpVerificationResult } from './mcp/signing';
+
+// Rate limiter
+export { McpSlidingRateLimiter } from './mcp/rate-limiter';
+export type { McpRateLimitDecision } from './mcp/rate-limiter';
+
+// Gateway
+export { McpGateway, McpGatewayStatus } from './mcp/gateway';
+export type { McpGatewayConfig, McpGatewayRequest, McpGatewayDecision } from './mcp/gateway';
