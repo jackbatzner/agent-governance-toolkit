@@ -24,7 +24,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 1. Fork the repository and create a feature branch from `main`
 2. Read the nearest `AGENTS.md` before changing code in that area
-3. Make your changes in the appropriate package or top-level directory
+3. Make your changes in the appropriate package or top-level directory for that part of the repo
 4. Add or update tests as needed
 5. Ensure all tests pass: `pytest`
 6. Update documentation if your change affects public APIs
@@ -34,14 +34,15 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 This repo is a monorepo. Choosing the right path up front makes review much faster.
 The layout is also evolving: some language implementations may move from shared directories into
-standalone top-level directories over time. Treat the paths below as the current layout, not a
-permanent architecture promise.
+standalone top-level directories at the repository root over time. The first approved example is
+`agent-governance-dotnet/`, with `agent-governance-golang/` anticipated as a future sibling when
+that SDK moves. Treat the paths below as the current layout, not a permanent architecture promise.
 
 | If your change is about... | Start here |
 |----------------------------|------------|
 | Core governance/runtime behavior | `packages/` |
-| Current shared SDK implementations | `packages/agent-mesh/sdks/` or `packages/agent-governance-dotnet/` |
-| Standalone language implementations | `agent-governance-*/` when present |
+| Current shared SDK implementations | `packages/agent-mesh/sdks/` or `packages/agent-governance-dotnet/` while those SDKs still live in the shared layout |
+| Standalone language implementations | Reserved root-level paths such as `agent-governance-dotnet/`, future `agent-governance-golang/`, or other `agent-governance-*` siblings when present |
 | Tutorials, architecture, package docs | `docs/` |
 | Runnable framework integrations | `examples/` |
 | Interactive or live demos | `demo/` |
@@ -52,7 +53,8 @@ If a directory contains an `AGENTS.md` file, read it before you start. It captur
 commands, boundaries, and review expectations for that area.
 If a standalone top-level language directory exists for the implementation you are changing, prefer
 that directory over an older shared path unless maintainers tell you to keep work in the legacy
-location.
+location. For the approved .NET standalone migration, root-level contributor guidance should point
+to `agent-governance-dotnet/` as the destination path once it is introduced.
 
 ### Choose the Smallest Correct Surface
 
@@ -164,7 +166,7 @@ docker compose --profile dashboard up --build dashboard
 
 ### Package Structure
 
-This is a mono-repo with ten packages:
+This is a mono-repo with ten packages today:
 
 | Package | Directory | Description |
 |---------|-----------|-------------|
@@ -178,6 +180,10 @@ This is a mono-repo with ten packages:
 | `agent-hypervisor` | `packages/agent-hypervisor/` | Runtime infrastructure and capability management |
 | `agent-governance-dotnet` | `packages/agent-governance-dotnet/` | .NET framework integration for agent governance |
 | `agentmesh-integrations` | `packages/agentmesh-integrations/` | Framework integrations and extension library |
+
+Standalone language SDKs may also live at the repository root as that migration lands. The first
+planned example is `agent-governance-dotnet/`; `agent-governance-golang/` is the anticipated next
+sibling when Go gets a standalone top-level home.
 
 ### Coding Guidelines
 
