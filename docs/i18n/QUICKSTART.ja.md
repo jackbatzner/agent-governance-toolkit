@@ -210,8 +210,8 @@ agent-governance integrity --manifest integrity.json
 | 内容 | リンク |
 |------|--------|
 | 完全なAPIリファレンス (Python) | [packages/agent-os/README.md](packages/agent-os/README.md) |
-| TypeScript SDK ドキュメント | [agent-governance-typescript/README.md](../../agent-governance-typescript/README.md) |
-| .NET SDK ドキュメント | [agent-governance-dotnet/README.md](../../agent-governance-dotnet/README.md) |
+| TypeScript パッケージ ドキュメント | [agent-governance-typescript/README.md](../../agent-governance-typescript/README.md) |
+| .NET パッケージ ドキュメント | [agent-governance-dotnet/README.md](agent-governance-dotnet/README.md) |
 | OWASP カバレッジマップ | [docs/OWASP-COMPLIANCE.md](docs/OWASP-COMPLIANCE.md) |
 | フレームワーク統合 | [packages/agent-os/src/agent_os/integrations/](packages/agent-os/src/agent_os/integrations/) |
 | サンプルアプリケーション | [packages/agent-os/examples/](packages/agent-os/examples/) |
@@ -221,3 +221,4 @@ agent-governance integrity --manifest integrity.json
 ---
 
 *本クイックスタートは、 [@davidequarracino](https://github.com/davidequarracino) による初期の貢献 ([#106](https://github.com/microsoft/agent-governance-toolkit/pull/106), [#108](https://github.com/microsoft/agent-governance-toolkit/pull/108)) に基づいています。*
+
