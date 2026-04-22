@@ -3,8 +3,8 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts"],
-  format: ["cjs", "esm"],
+  entry: ["src/index.ts", "src/plugin-entry.ts"],
+  format: ["esm"],
   dts: true,
   clean: true,
   sourcemap: true,
@@ -15,5 +15,6 @@ export default defineConfig({
     "@microsoft/agentmesh-sdk/mcp",
     "@microsoft/agentmesh-sdk/policy",
     "@microsoft/agentmesh-sdk/types",
+    "openclaw/plugin-sdk/plugin-entry",
   ],
 });

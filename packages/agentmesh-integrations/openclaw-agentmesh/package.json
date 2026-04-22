@@ -2,10 +2,12 @@
   "name": "@microsoft/agentmesh-openclaw",
   "version": "0.1.0",
   "description": "Public Preview — Governance adapter for OpenClaw built on @microsoft/agentmesh-sdk",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "openclaw.plugin.json"
   ],
   "scripts": {
     "build": "tsup",
@@ -41,13 +43,28 @@
     "vitest": "3.0.5"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./src/plugin-entry.ts"
+    ],
+    "runtimeExtensions": [
+      "./dist/plugin-entry.js"
+    ],
+    "install": {
+      "npmSpec": "@microsoft/agentmesh-openclaw",
+      "defaultChoice": "npm"
+    }
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin-entry.d.ts",
+      "import": "./dist/plugin-entry.js"
     }
   }
 }

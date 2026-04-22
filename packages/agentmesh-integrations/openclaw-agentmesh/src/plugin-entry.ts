@@ -1,0 +1,62 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { registerOpenClawGovernanceHooks } from "./adapter";
+
+export const openClawGovernancePluginConfigSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    policyFile: {
+      type: "string",
+      description: "Absolute or working-directory-relative path to a JSON policy bundle.",
+    },
+    policies: {
+      type: "array",
+      description: "Inline AGT policy objects loaded directly into the OpenClaw governance adapter.",
+      items: {
+        type: "object",
+      },
+    },
+    agentId: {
+      type: "string",
+      description: "Logical AGT agent identifier used in policy and audit records.",
+    },
+    agentDid: {
+      type: "string",
+      description: "Logical AGT DID used for policy evaluation.",
+    },
+    failClosed: {
+      type: "boolean",
+      description: "When true, policy/audit failures deny tool execution instead of throwing.",
+    },
+    audit: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        enabled: {
+          type: "boolean",
+          description: "Enable or disable AGT audit logging.",
+        },
+        stdout: {
+          type: "boolean",
+          description: "Emit structured AGT audit records to stdout.",
+        },
+        maxEntries: {
+          type: "number",
+          description: "Maximum in-memory audit entries retained by the SDK logger.",
+        },
+      },
+    },
+  },
+} as const;
+
+export default definePluginEntry({
+  id: "agentmesh-openclaw",
+  name: "AgentMesh OpenClaw Governance",
+  description: "Public Preview — Native OpenClaw plugin entry for AGT policy enforcement and audit hooks.",
+  configSchema: openClawGovernancePluginConfigSchema,
+  register(api) {
+    registerOpenClawGovernanceHooks(api);
+  },
+});

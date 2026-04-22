@@ -5,7 +5,7 @@ Build and test a full OpenClaw + AGT flow using the OpenClaw adapter package, th
 This tutorial is the **follow-along path** for platform engineers and OpenClaw developers who want one place to cover:
 
 1. installing the adapter and SDK
-2. registering the adapter with the OpenClaw SDK `before_tool_call` surface
+2. installing the native OpenClaw governance plugin
 3. scanning MCP tool definitions
 4. exporting audits
 5. building the OpenClaw deployment artifact
@@ -42,8 +42,8 @@ The key boundary is:
 You need:
 
 - a working OpenClaw checkout
-- Node.js 18+
-- access to the OpenClaw SDK or plugin surface that lets you intercept tool calls before execution
+- Node.js 22+
+- an OpenClaw deployment that supports native plugins
 - only if you are maintaining OpenClaw itself: access to the underlying interception files and wrappers
 
 If you are also testing on AKS, you additionally need:
@@ -61,7 +61,7 @@ There are three practical ways to test this integration.
 Use this when you want the cleanest customer-like path.
 
 ```bash
-npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
+openclaw plugins install @microsoft/agentmesh-openclaw
 ```
 
 ### Option B: local source for both SDK and adapter
@@ -122,104 +122,61 @@ Create a policy file in your OpenClaw checkout.
 ]
 ```
 
-## Step 2: create a governance bootstrap module
+## Step 2: configure the native OpenClaw plugin
 
-Create one shared adapter instance during OpenClaw startup.
+After installation, point the plugin at the policy bundle in your OpenClaw config:
 
-**`src/agents/governance.ts`**
+```json
+{
+  "plugins": {
+    "entries": {
+      "agentmesh-openclaw": {
+        "config": {
+          "policyFile": "./config/openclaw-governance.policies.json",
+          "agentId": "openclaw-main-agent",
+          "agentDid": "did:agentmesh:openclaw-main-agent",
+          "audit": {
+            "enabled": true,
+            "stdout": true,
+            "maxEntries": 5000
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+The shipped plugin entry then:
+
+1. loads the configured JSON policy bundle
+2. registers `before_tool_call`
+3. maps AGT decisions into OpenClaw `allow | deny | review`
+4. registers `after_tool_call` for audit logging when audit is enabled
+
+## Step 3: keep manual hook wiring as a fallback only
+
+If you are maintaining OpenClaw itself or wrapping the package inside another custom plugin, you can still use the exported helper:
 
 ```ts
-import { readFileSync } from "node:fs";
-import { AuditLogger } from "@microsoft/agentmesh-sdk/audit";
-import type { Policy } from "@microsoft/agentmesh-sdk/types";
-import { createOpenClawGovernanceAdapter } from "@microsoft/agentmesh-openclaw";
+import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { registerOpenClawGovernanceHooks } from "@microsoft/agentmesh-openclaw";
 
-function loadPolicies(): Policy[] {
-  const raw = readFileSync(
-    new URL("../../config/openclaw-governance.policies.json", import.meta.url),
-    "utf8",
-  );
-
-  return JSON.parse(raw) as Policy[];
-}
-
-const auditLogger = new AuditLogger({ maxEntries: 5_000 });
-
-export const governance = createOpenClawGovernanceAdapter({
-  agentId: "openclaw-main-agent",
-  agentDid: "did:agentmesh:openclaw-main-agent",
-  policies: loadPolicies(),
-  audit: {
-    enabled: true,
-    logger: {
-      log(entry) {
-        const auditEntry = auditLogger.log(entry);
-        process.stdout.write(
-          `${JSON.stringify({ event: "agt.openclaw.audit", ...auditEntry })}\n`,
-        );
-        return auditEntry;
-      },
-    },
-  },
+export default definePluginEntry({
+  id: "custom-governance-wrapper",
+  name: "Custom Governance Wrapper",
+  description: "Registers AGT governance hooks through a custom plugin entry.",
+  register(api) {
+    registerOpenClawGovernanceHooks(api, {
+      policyFile: "./config/openclaw-governance.policies.json",
+      audit: {
+        enabled: true,
+        stdout: true
+      }
+    });
+  }
 });
 ```
-
-## Step 3: register the adapter with the OpenClaw SDK
-
-Use the adapter anywhere the OpenClaw SDK exposes a `before_tool_call` registration surface.
-
-```ts
-import { governance } from "./governance";
-
-export function registerGovernanceWithOpenClaw(openclawSdk: {
-  registerBeforeToolCallHook: (
-    hook: (input: {
-      tool: { name: string; description?: string };
-      args: Record<string, unknown>;
-      requestId?: string;
-      sessionId?: string;
-      userId?: string;
-    }) => Promise<unknown>,
-  ) => void;
-}) {
-  openclawSdk.registerBeforeToolCallHook(async ({ tool, args, requestId, sessionId, userId }) => {
-    const result = await governance.evaluateBeforeToolCall({
-      toolName: tool.name,
-      toolDescription: tool.description,
-      params: args,
-      requestId,
-      sessionId,
-      userId,
-    });
-
-    if (result.decision === "deny") {
-      return {
-        block: true,
-        reason: result.reason ?? "Blocked by governance policy.",
-      };
-    }
-
-    if (result.decision === "review") {
-      return {
-        block: true,
-        requiresApproval: true,
-        reason: result.reason ?? "Approval required by governance policy.",
-        metadata: {
-          approvers: result.approvers,
-          matchedRule: result.matchedRule,
-          policyName: result.policyName,
-        },
-      };
-    }
-
-    return {
-      args: result.rewrittenParams ?? args,
-    };
-  });
-}
-```
-
-> **Note:** `registerBeforeToolCallHook(...)` is illustrative. Use the actual registration API exposed by your OpenClaw SDK version.
 
 ## Step 4: keep source edits as a fallback only
 

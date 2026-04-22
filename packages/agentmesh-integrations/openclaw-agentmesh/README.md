@@ -18,12 +18,21 @@ For broader deployment guidance, see:
 ## Install
 
 ```bash
+openclaw plugins install @microsoft/agentmesh-openclaw
+```
+
+If you are developing locally or installing without the OpenClaw plugin installer:
+
+```bash
 npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
 ```
 
 ## What this package gives you
 
+- a **native OpenClaw plugin entry** that registers `before_tool_call` and `after_tool_call` hooks
 - `createOpenClawGovernanceAdapter()` — reusable adapter instance for OpenClaw tool governance
+- `createOpenClawGovernanceAdapterFromPluginConfig()` — adapter construction from native plugin config
+- `registerOpenClawGovernanceHooks()` — manual hook registration for advanced/custom plugin setups
 - `evaluateBeforeToolCall()` — policy evaluation before OpenClaw executes a tool
 - `recordAfterToolCall()` — post-execution audit logging for success/error outcomes
 - `scanMcpToolDefinition()` / `scanMcpToolDefinitions()` — MCP tool-definition scanning before tool registration or use
@@ -39,10 +48,45 @@ npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
 
 For most developers, the easiest setup is:
 
-1. install `@microsoft/agentmesh-openclaw` and `@microsoft/agentmesh-sdk`
-2. create one shared governance adapter instance
-3. register it with the OpenClaw SDK or plugin surface that exposes `before_tool_call`
-4. route `allow | deny | review` back into normal OpenClaw execution or approval behavior
+1. install `@microsoft/agentmesh-openclaw` into the OpenClaw app
+2. point the plugin at a policy bundle with `plugins.entries.agentmesh-openclaw.config.policyFile`
+3. let the native plugin entry register `before_tool_call` and `after_tool_call`
+4. route OpenClaw approvals and audit export the same way you already operate the host runtime
+
+### Runtime flow
+
+```text
+OpenClaw tool request
+    |
+    v
+before_tool_call hook
+    |
+    v
+@microsoft/agentmesh-openclaw
+    |
+    +--> normalize tool-call context
+    +--> call AGT policy engine
+    +--> map result to allow | deny | review
+    |
+    v
+OpenClaw enforces the result
+    |
+    +--> allow  -> execute tool
+    +--> deny   -> block tool
+    +--> review -> native approval flow
+    |
+    v
+after_tool_call hook (when audit is enabled)
+    |
+    v
+AGT audit logging
+```
+
+Truthful boundary:
+
+- the native plugin **does** register `before_tool_call` and `after_tool_call`
+- the native plugin **does not** auto-scan every tool catalog; use `scanMcpToolDefinition()` / `scanMcpToolDefinitions()` explicitly where you assemble tools
+- OpenClaw still owns execution, approval UX, retries, and sandboxing
 
 ### Underlying hook references
 
@@ -59,13 +103,12 @@ The adapter is designed to fit that same interception model even when registrati
 ## Setup checklist
 
 1. Define a governance policy bundle for the tools you expose.
-2. Load the policy bundle during OpenClaw startup.
-3. Create one shared adapter instance.
-4. Register `evaluateBeforeToolCall()` with the OpenClaw SDK `before_tool_call` surface.
-5. Treat the source-level hook path as a maintainer fallback, not the normal app-developer path.
-6. Route `review` decisions into your approval workflow.
-7. Scan MCP tool definitions before registration.
-8. Call `recordAfterToolCall()` after execution so audits contain the final outcome.
+2. Install and enable the native OpenClaw plugin entry.
+3. Configure `policyFile` and optional audit settings in `plugins.entries.agentmesh-openclaw.config`.
+4. Treat the source-level hook path as a maintainer fallback, not the normal app-developer path.
+5. Route `review` decisions into your approval workflow.
+6. Scan MCP tool definitions before registration.
+7. Export post-call audits to a durable sink.
 
 ---
 
@@ -126,100 +169,65 @@ If your team stores policy in YAML or a database, load and parse it before adapt
 
 ---
 
-## 2. Create one shared adapter instance
+## 2. Enable the native OpenClaw plugin
 
-Create the adapter near your OpenClaw startup or tool assembly code:
+The package now ships a real OpenClaw plugin entry and manifest, so the default path no longer needs a custom bootstrap module.
 
-```ts
-import { createOpenClawGovernanceAdapter } from "@microsoft/agentmesh-openclaw";
-import { AuditLogger } from "@microsoft/agentmesh-sdk/audit";
-import { loadPolicies } from "./load-policies";
+Add plugin config in your OpenClaw configuration:
 
-const auditLogger = new AuditLogger({ maxEntries: 5_000 });
-
-export const governance = createOpenClawGovernanceAdapter({
-  agentId: "openclaw-main-agent",
-  agentDid: "did:agentmesh:openclaw-main-agent",
-  policies: loadPolicies(),
-  audit: {
-    enabled: true,
-    logger: {
-      log(entry) {
-        const auditEntry = auditLogger.log(entry);
-        process.stdout.write(
-          `${JSON.stringify({ event: "agt.openclaw.audit", ...auditEntry })}\n`,
-        );
-        return auditEntry;
-      },
-    },
-  },
-});
-```
-
-### Why share one adapter instance?
-
-- The policy engine is loaded once at startup.
-- Audit hashes remain in sequence for that process.
-- MCP scan decisions stay consistent for the same tool catalog.
-
----
-
-## 3. Register the adapter with the OpenClaw SDK hook
-
-Use the adapter anywhere the OpenClaw SDK exposes a `before_tool_call` registration surface:
-
-```ts
-import { governance } from "./governance";
-
-export function registerGovernanceWithOpenClaw(openclawSdk: {
-  registerBeforeToolCallHook: (
-    hook: (input: {
-      tool: { name: string; description?: string };
-      args: Record<string, unknown>;
-      requestId?: string;
-      sessionId?: string;
-      userId?: string;
-    }) => Promise<unknown>,
-  ) => void;
-}) {
-  openclawSdk.registerBeforeToolCallHook(async ({ tool, args, requestId, sessionId, userId }) => {
-    const result = await governance.evaluateBeforeToolCall({
-      toolName: tool.name,
-      toolDescription: tool.description,
-      params: args,
-      requestId,
-      sessionId,
-      userId,
-    });
-
-    if (result.decision === "deny") {
-      return {
-        block: true,
-        reason: result.reason ?? "Blocked by governance policy.",
-      };
+```json
+{
+  "plugins": {
+    "entries": {
+      "agentmesh-openclaw": {
+        "config": {
+          "policyFile": "./config/openclaw-governance.policies.json",
+          "agentId": "openclaw-main-agent",
+          "agentDid": "did:agentmesh:openclaw-main-agent",
+          "audit": {
+            "enabled": true,
+            "stdout": true,
+            "maxEntries": 5000
+          }
+        }
+      }
     }
-
-    if (result.decision === "review") {
-      return {
-        block: true,
-        requiresApproval: true,
-        reason: result.reason ?? "Approval required by governance policy.",
-        metadata: {
-          approvers: result.approvers,
-          matchedRule: result.matchedRule,
-          policyName: result.policyName,
-        },
-      };
-    }
-
-    return {
-      args: result.rewrittenParams ?? args,
-    };
-  });
+  }
 }
 ```
 
-> **Note:** `registerBeforeToolCallHook(...)` is illustrative. Use the actual registration API exposed by your OpenClaw SDK version. The important part is the adapter callback shape and the returned `allow | deny | review` handling.
+What the native plugin entry does:
+
+- loads the configured JSON policy bundle
+- registers `before_tool_call` and `after_tool_call` hooks
+- maps AGT policy actions into OpenClaw `allow | deny | review` behavior
+- emits audit records to stdout when `audit.stdout` is enabled
+
+---
+
+## 3. Advanced: register hooks manually
+
+If you are building a custom OpenClaw plugin package and want direct control over hook registration, use the exported helper instead of reimplementing the mapping yourself:
+
+```ts
+import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { registerOpenClawGovernanceHooks } from "@microsoft/agentmesh-openclaw";
+
+export default definePluginEntry({
+  id: "custom-governance-wrapper",
+  name: "Custom Governance Wrapper",
+  description: "Registers AGT governance hooks through a custom plugin entry.",
+  register(api) {
+    registerOpenClawGovernanceHooks(api, {
+      policyFile: "./config/openclaw-governance.policies.json",
+      audit: {
+        enabled: true,
+        stdout: true,
+      },
+    });
+  },
+});
+```
 
 ### Source-level fallback
 
@@ -249,7 +257,7 @@ When the adapter returns `review`, AGT is telling OpenClaw that the call should 
 Recommended flow:
 
 1. `beforeToolCallHook()` returns `requiresApproval: true`.
-2. OpenClaw stores the pending request, tool name, arguments, and `approvers`.
+2. OpenClaw stores the pending request and shows its native approval surface.
 3. Your approval system notifies the listed approvers.
 4. Only after approval do you re-run or resume the tool call.
 
@@ -310,49 +318,9 @@ Use `scanMcpToolDefinitions()` instead if you want to evaluate the full catalog 
 
 ## 7. Record post-call audit events
 
-Record the final outcome around the wrapped tool execution path:
+The native plugin entry registers `after_tool_call` automatically when audit logging is enabled.
 
-```ts
-import { governance } from "./governance";
-
-export async function executeGovernedTool(
-  tool: {
-    name: string;
-    execute: (args: Record<string, unknown>) => Promise<unknown>;
-  },
-  args: Record<string, unknown>,
-  requestId?: string,
-  sessionId?: string,
-) {
-  const startedAt = Date.now();
-
-  try {
-    const output = await tool.execute(args);
-
-    await governance.recordAfterToolCall({
-      toolName: tool.name,
-      params: args,
-      result: output,
-      requestId,
-      sessionId,
-      durationMs: Date.now() - startedAt,
-    });
-
-    return output;
-  } catch (error) {
-    await governance.recordAfterToolCall({
-      toolName: tool.name,
-      params: args,
-      error,
-      requestId,
-      sessionId,
-      durationMs: Date.now() - startedAt,
-    });
-
-    throw error;
-  }
-}
-```
+If you need to override that behavior in a custom entry, call `recordAfterToolCall()` yourself from your own `after_tool_call` hook implementation.
 
 ### Production note on audit persistence
 

@@ -8,22 +8,48 @@ This is the TypeScript adapter path for OpenClaw operators and platform teams. I
 
 | Area | Shipped in repo | You still own in your OpenClaw deployment |
 |---|---|---|
-| Before-tool governance | `evaluateBeforeToolCall()` | Calling it from OpenClaw's hook and acting on the result |
-| Post-tool audit | `recordAfterToolCall()` | Persisting or exporting audit data outside process memory |
+| Before-tool governance | Native plugin entry + `evaluateBeforeToolCall()` | Supplying policy config and acting on the result |
+| Post-tool audit | Native plugin entry + `recordAfterToolCall()` | Persisting or exporting audit data outside process memory |
 | MCP scan | `scanMcpToolDefinition()` / `scanMcpToolDefinitions()` | Deciding whether review findings block registration |
 | Approval signal | `review` decision + `approvers` list | Approval UX, queueing, reviewer identity, and resume behavior |
 | Runtime isolation | Not part of the adapter | OpenClaw sandboxing, container policy, network policy, secrets handling |
 
-## Preferred integration model: OpenClaw SDK first
+## Preferred integration model: native OpenClaw plugin first
 
 For most developers, the best path is:
 
-1. install the adapter and SDK in the OpenClaw app
-2. create one shared governance adapter instance
-3. register that adapter with the OpenClaw SDK or plugin surface that handles `before_tool_call`
+1. install the package with `openclaw plugins install @microsoft/agentmesh-openclaw`
+2. configure `plugins.entries.agentmesh-openclaw.config.policyFile`
+3. let the shipped plugin entry register `before_tool_call` and `after_tool_call`
 4. route `allow | deny | review` into normal OpenClaw behavior
 
 The adapter is still designed around OpenClaw's existing interception path, but **source-file edits should be treated as a fallback path**, not the default onboarding flow for application developers.
+
+```text
+OpenClaw runtime
+    |
+    +--> native plugin entry loads config
+    +--> before_tool_call
+            |
+            v
+        AGT adapter
+            |
+            +--> evaluate policy
+            +--> return allow | deny | review
+    |
+    +--> OpenClaw enforces result
+    |
+    +--> after_tool_call
+            |
+            v
+        AGT audit logging
+```
+
+What is true today:
+
+- the package ships a native OpenClaw plugin entry and manifest
+- it uses AGT for policy evaluation and post-call audit logging
+- MCP scan helpers are available, but you still choose where to call them in tool registration code
 
 ### Underlying hook path
 
@@ -36,8 +62,8 @@ If you are self-hosting or maintaining OpenClaw itself, the known underlying int
 See the package README for the concrete snippets and fallback source-level examples:
 
 - [Install and load policy bundles](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#1-define-a-policy-bundle)
-- [Create the shared adapter instance](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#2-create-one-shared-adapter-instance)
-- [Register the adapter with the OpenClaw SDK hook](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#3-register-the-adapter-with-the-openclaw-sdk-hook)
+- [Enable the native plugin](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#2-enable-the-native-openclaw-plugin)
+- [Register hooks manually](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#3-advanced-register-hooks-manually)
 - [Enable MCP scanning](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#6-enable-mcp-tool-definition-scanning-before-registration)
 - [Record post-call audits](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#7-record-post-call-audit-events)
 
@@ -79,16 +105,9 @@ If you already have a central policy service, implement `policyEngine.evaluatePo
 
 That makes AGT a **protective control before tool execution**, not just a logging layer after the fact.
 
-### SDK registration shape
+### Native plugin registration shape
 
-The exact OpenClaw SDK API can vary by version, but the adapter should be registered anywhere the SDK lets you intercept tool calls before execution.
-
-That registration should:
-
-1. pass the OpenClaw tool name, description, params, and request/session metadata into `evaluateBeforeToolCall()`
-2. stop execution on `deny`
-3. route `review` into OpenClaw's approval path
-4. call `recordAfterToolCall()` after completion or error
+The default package path now ships the OpenClaw plugin entry, manifest, and `openclaw.runtimeExtensions` metadata needed for native loading. Manual registration is still available for advanced wrappers, but it is no longer the primary setup story.
 
 ### 3. Keep approvals explicit
 

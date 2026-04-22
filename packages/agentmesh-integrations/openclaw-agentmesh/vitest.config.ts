@@ -14,6 +14,9 @@ export default defineConfig({
       "@microsoft/agentmesh-sdk/mcp": `${sdkRoot}mcp.ts`,
       "@microsoft/agentmesh-sdk/policy": `${sdkRoot}policy.ts`,
       "@microsoft/agentmesh-sdk/types": `${sdkRoot}types.ts`,
+      "openclaw/plugin-sdk/plugin-entry": fileURLToPath(
+        new URL("./tests/openclaw-plugin-entry.stub.ts", import.meta.url),
+      ),
     },
   },
 });

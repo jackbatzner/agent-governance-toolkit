@@ -27,6 +27,37 @@ For most OpenClaw deployments on AKS:
 4. Keep governance endpoints internal-only if you also run a sidecar or shared governance service.
 5. Use AKS security features to contain the runtime because AGT does not sandbox the process itself.
 
+```text
+                AKS pod
++--------------------------------------------------+
+| OpenClaw container                               |
+|                                                  |
+|  before_tool_call                                |
+|       |                                          |
+|       v                                          |
+|  @microsoft/agentmesh-openclaw                   |
+|       |                                          |
+|       +--> AGT policy decision                   |
+|       +--> allow | deny | review                 |
+|       |                                          |
+|       v                                          |
+|  OpenClaw executes or blocks                     |
+|       |                                          |
+|       v                                          |
+|  after_tool_call -> AGT audit logging            |
++--------------------------------------------------+
+
+Optional:
+  - sidecar service in same pod/namespace
+  - shared governance service elsewhere in cluster
+
+Still required outside AGT:
+  - runtime sandboxing
+  - network policy
+  - secret handling
+  - approval operations
+```
+
 ## Policy bundles: ConfigMap vs. Secret
 
 ### Use a ConfigMap when
@@ -216,8 +247,8 @@ That makes AGT a pre-execution governance control, but not the only protective b
 
 - [ ] Policy bundle mounted read-only from ConfigMap or equivalent
 - [ ] Secrets separated from policy documents
-- [ ] Adapter wired into `src/agents/pi-tools.before-tool-call.ts`
-- [ ] `wrapToolWithBeforeToolCallHook(...)` path used consistently for governed tools
+- [ ] Native OpenClaw plugin installed and configured
+- [ ] Source-level hook edits used only when native plugin loading is not available
 - [ ] `review` decisions routed to a real approval process
 - [ ] MCP tool definitions scanned before registration
 - [ ] Post-call audits exported off-pod

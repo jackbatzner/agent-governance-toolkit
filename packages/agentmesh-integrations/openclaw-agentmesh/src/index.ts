@@ -2,8 +2,10 @@
 // Licensed under the MIT License.
 export {
   createOpenClawGovernanceAdapter,
+  createOpenClawGovernanceAdapterFromPluginConfig,
   evaluateBeforeToolCall,
   recordAfterToolCall,
+  registerOpenClawGovernanceHooks,
   scanOpenClawMcpToolDefinition as scanMcpToolDefinition,
   scanOpenClawMcpToolDefinitions as scanMcpToolDefinitions,
 } from "./adapter";
@@ -24,5 +26,9 @@ export type {
   OpenClawGovernanceDecision,
   OpenClawMcpScanResult,
   OpenClawMcpScanner,
+  OpenClawNativePluginApi,
+  OpenClawNativePluginConfig,
+  OpenClawNativePluginHookOptions,
+  OpenClawNativePluginLogger,
   OpenClawPolicyEngine,
 } from "./types";

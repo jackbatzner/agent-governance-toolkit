@@ -25,6 +25,82 @@ export interface OpenClawPolicyEngine {
   loadPolicy?(policy: Policy): void;
 }
 
+export interface OpenClawNativePluginLogger {
+  info?(message: string, ...args: unknown[]): void;
+  warn?(message: string, ...args: unknown[]): void;
+  error?(message: string, ...args: unknown[]): void;
+}
+
+export interface OpenClawNativePluginHookOptions {
+  priority?: number;
+}
+
+export interface OpenClawNativeBeforeToolCallEvent {
+  toolName: string;
+  params: Record<string, unknown>;
+  runId?: string;
+  toolCallId?: string;
+}
+
+export interface OpenClawNativeAfterToolCallEvent {
+  toolName: string;
+  params: Record<string, unknown>;
+  runId?: string;
+  toolCallId?: string;
+  result?: unknown;
+  error?: string;
+  durationMs?: number;
+}
+
+export interface OpenClawNativeToolHookContext {
+  agentId?: string;
+  sessionKey?: string;
+  sessionId?: string;
+  runId?: string;
+  toolName: string;
+  toolCallId?: string;
+}
+
+export interface OpenClawNativeApprovalRequest {
+  title: string;
+  description: string;
+  severity?: "info" | "warning" | "critical";
+  timeoutMs?: number;
+  timeoutBehavior?: "allow" | "deny";
+  pluginId?: string;
+  onResolution?: (decision: string) => Promise<void> | void;
+}
+
+export interface OpenClawNativeBeforeToolCallResult {
+  params?: Record<string, unknown>;
+  block?: boolean;
+  blockReason?: string;
+  requireApproval?: OpenClawNativeApprovalRequest;
+}
+
+export interface OpenClawNativePluginApi {
+  pluginConfig?: Record<string, unknown>;
+  logger?: OpenClawNativePluginLogger;
+  registerHook: (
+    events: string | string[],
+    handler: (event: unknown, ctx: unknown) => Promise<unknown> | unknown,
+    opts?: OpenClawNativePluginHookOptions,
+  ) => void;
+}
+
+export interface OpenClawNativePluginConfig {
+  policyFile?: string;
+  policies?: Policy[];
+  agentId?: string;
+  agentDid?: string;
+  failClosed?: boolean;
+  audit?: {
+    enabled?: boolean;
+    stdout?: boolean;
+    maxEntries?: number;
+  };
+}
+
 export interface OpenClawAuditLogger {
   log(entry: Omit<AuditEntry, "timestamp" | "hash" | "previousHash">): AuditEntry;
 }
