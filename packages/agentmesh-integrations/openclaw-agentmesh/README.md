@@ -11,6 +11,7 @@ This package is the **in-process** OpenClaw integration path:
 For broader deployment guidance, see:
 
 - [OpenClaw adapter guide](../../../docs/integrations/openclaw-adapter.md)
+- [OpenClaw end-to-end tutorial](../../../docs/tutorials/34-openclaw-end-to-end.md)
 - [OpenClaw AKS protection guidance](../../../docs/deployment/openclaw-aks-protection.md)
 - [OpenClaw sidecar pattern](../../../docs/deployment/openclaw-sidecar.md)
 

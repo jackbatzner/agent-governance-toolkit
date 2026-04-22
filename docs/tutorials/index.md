@@ -48,3 +48,4 @@
 | 20 | [TypeScript SDK](20-typescript-sdk.md) | Agent governance in TypeScript |
 | 21 | [Rust SDK](21-rust-sdk.md) | Agent governance in Rust |
 | 22 | [Go SDK](22-go-sdk.md) | Agent governance in Go |
+| 34 | [OpenClaw End-to-End](34-openclaw-end-to-end.md) | Install the OpenClaw adapter and SDK, wire the hook, build the deployment, and validate it locally and on AKS |

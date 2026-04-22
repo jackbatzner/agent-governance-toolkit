@@ -30,6 +30,8 @@ See the package README for the concrete code snippets:
 - [Enable MCP scanning](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#6-enable-mcp-tool-definition-scanning-before-registration)
 - [Record post-call audits](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#7-record-post-call-audit-events)
 
+If you want one follow-along guide that starts with installation and ends with AKS validation, use the [OpenClaw end-to-end tutorial](../tutorials/34-openclaw-end-to-end.md).
+
 ## Deployment choices
 
 Choose the topology that matches how much separation you need between OpenClaw and AGT.
