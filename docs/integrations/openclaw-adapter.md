@@ -14,19 +14,30 @@ This is the TypeScript adapter path for OpenClaw operators and platform teams. I
 | Approval signal | `review` decision + `approvers` list | Approval UX, queueing, reviewer identity, and resume behavior |
 | Runtime isolation | Not part of the adapter | OpenClaw sandboxing, container policy, network policy, secrets handling |
 
-## Known OpenClaw integration points
+## Preferred integration model: OpenClaw SDK first
 
-The adapter is meant to plug into the OpenClaw hook points already used for tool interception:
+For most developers, the best path is:
+
+1. install the adapter and SDK in the OpenClaw app
+2. create one shared governance adapter instance
+3. register that adapter with the OpenClaw SDK or plugin surface that handles `before_tool_call`
+4. route `allow | deny | review` into normal OpenClaw behavior
+
+The adapter is still designed around OpenClaw's existing interception path, but **source-file edits should be treated as a fallback path**, not the default onboarding flow for application developers.
+
+### Underlying hook path
+
+If you are self-hosting or maintaining OpenClaw itself, the known underlying interception points are:
 
 - `src/agents/pi-tools.ts`
 - `src/agents/pi-tools.before-tool-call.ts`
 - `wrapToolWithBeforeToolCallHook(...)`
 
-See the package README for the concrete code snippets:
+See the package README for the concrete snippets and fallback source-level examples:
 
 - [Install and load policy bundles](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#1-define-a-policy-bundle)
 - [Create the shared adapter instance](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#2-create-one-shared-adapter-instance)
-- [Wire `before_tool_call`](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#3-wire-before_tool_call-into-srcagentspi-toolsbefore-tool-callts)
+- [Register the adapter with the OpenClaw SDK hook](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#3-register-the-adapter-with-the-openclaw-sdk-hook)
 - [Enable MCP scanning](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#6-enable-mcp-tool-definition-scanning-before-registration)
 - [Record post-call audits](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#7-record-post-call-audit-events)
 
@@ -67,6 +78,17 @@ If you already have a central policy service, implement `policyEngine.evaluatePo
 - `review` means OpenClaw should stop and route the request to a human or approval service.
 
 That makes AGT a **protective control before tool execution**, not just a logging layer after the fact.
+
+### SDK registration shape
+
+The exact OpenClaw SDK API can vary by version, but the adapter should be registered anywhere the SDK lets you intercept tool calls before execution.
+
+That registration should:
+
+1. pass the OpenClaw tool name, description, params, and request/session metadata into `evaluateBeforeToolCall()`
+2. stop execution on `deny`
+3. route `review` into OpenClaw's approval path
+4. call `recordAfterToolCall()` after completion or error
 
 ### 3. Keep approvals explicit
 

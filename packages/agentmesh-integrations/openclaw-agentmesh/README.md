@@ -35,15 +35,24 @@ npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
 - It does **not** persist audits outside process memory unless you supply that behavior.
 - It does **not** sandbox tool execution; OpenClaw, your container runtime, and AKS still own runtime isolation.
 
-## Known OpenClaw hook points
+## Preferred setup path
 
-The known OpenClaw interception points are:
+For most developers, the easiest setup is:
+
+1. install `@microsoft/agentmesh-openclaw` and `@microsoft/agentmesh-sdk`
+2. create one shared governance adapter instance
+3. register it with the OpenClaw SDK or plugin surface that exposes `before_tool_call`
+4. route `allow | deny | review` back into normal OpenClaw execution or approval behavior
+
+### Underlying hook references
+
+If you maintain OpenClaw itself or need a source-level fallback, the known underlying interception points are:
 
 - `src/agents/pi-tools.ts`
 - `src/agents/pi-tools.before-tool-call.ts`
 - `wrapToolWithBeforeToolCallHook(...)`
 
-The adapter is designed to plug into that existing flow.
+The adapter is designed to fit that same interception model even when registration happens through an SDK surface instead of direct source edits.
 
 ---
 
@@ -52,8 +61,8 @@ The adapter is designed to plug into that existing flow.
 1. Define a governance policy bundle for the tools you expose.
 2. Load the policy bundle during OpenClaw startup.
 3. Create one shared adapter instance.
-4. Call `evaluateBeforeToolCall()` from `src/agents/pi-tools.before-tool-call.ts`.
-5. Attach that hook with `wrapToolWithBeforeToolCallHook(...)` in `src/agents/pi-tools.ts`.
+4. Register `evaluateBeforeToolCall()` with the OpenClaw SDK `before_tool_call` surface.
+5. Treat the source-level hook path as a maintainer fallback, not the normal app-developer path.
 6. Route `review` decisions into your approval workflow.
 7. Scan MCP tool definitions before registration.
 8. Call `recordAfterToolCall()` after execution so audits contain the final outcome.
@@ -155,60 +164,69 @@ export const governance = createOpenClawGovernanceAdapter({
 
 ---
 
-## 3. Wire `before_tool_call` into `src/agents/pi-tools.before-tool-call.ts`
+## 3. Register the adapter with the OpenClaw SDK hook
 
-Use the adapter inside the existing `before_tool_call` hook implementation:
+Use the adapter anywhere the OpenClaw SDK exposes a `before_tool_call` registration surface:
 
 ```ts
 import { governance } from "./governance";
 
-export async function beforeToolCallHook({
-  tool,
-  args,
-  requestId,
-  sessionId,
-  userId,
-}: {
-  tool: { name: string; description?: string };
-  args: Record<string, unknown>;
-  requestId?: string;
-  sessionId?: string;
-  userId?: string;
+export function registerGovernanceWithOpenClaw(openclawSdk: {
+  registerBeforeToolCallHook: (
+    hook: (input: {
+      tool: { name: string; description?: string };
+      args: Record<string, unknown>;
+      requestId?: string;
+      sessionId?: string;
+      userId?: string;
+    }) => Promise<unknown>,
+  ) => void;
 }) {
-  const result = await governance.evaluateBeforeToolCall({
-    toolName: tool.name,
-    toolDescription: tool.description,
-    params: args,
-    requestId,
-    sessionId,
-    userId,
+  openclawSdk.registerBeforeToolCallHook(async ({ tool, args, requestId, sessionId, userId }) => {
+    const result = await governance.evaluateBeforeToolCall({
+      toolName: tool.name,
+      toolDescription: tool.description,
+      params: args,
+      requestId,
+      sessionId,
+      userId,
+    });
+
+    if (result.decision === "deny") {
+      return {
+        block: true,
+        reason: result.reason ?? "Blocked by governance policy.",
+      };
+    }
+
+    if (result.decision === "review") {
+      return {
+        block: true,
+        requiresApproval: true,
+        reason: result.reason ?? "Approval required by governance policy.",
+        metadata: {
+          approvers: result.approvers,
+          matchedRule: result.matchedRule,
+          policyName: result.policyName,
+        },
+      };
+    }
+
+    return {
+      args: result.rewrittenParams ?? args,
+    };
   });
-
-  if (result.decision === "deny") {
-    return {
-      block: true,
-      reason: result.reason ?? "Blocked by governance policy.",
-    };
-  }
-
-  if (result.decision === "review") {
-    return {
-      block: true,
-      requiresApproval: true,
-      reason: result.reason ?? "Approval required by governance policy.",
-      metadata: {
-        approvers: result.approvers,
-        matchedRule: result.matchedRule,
-        policyName: result.policyName,
-      },
-    };
-  }
-
-  return {
-    args: result.rewrittenParams ?? args,
-  };
 }
 ```
+
+> **Note:** `registerBeforeToolCallHook(...)` is illustrative. Use the actual registration API exposed by your OpenClaw SDK version. The important part is the adapter callback shape and the returned `allow | deny | review` handling.
+
+### Source-level fallback
+
+If your OpenClaw deployment does **not** expose a native SDK/plugin registration surface yet, wire the same callback into the underlying hook path in:
+
+- `src/agents/pi-tools.before-tool-call.ts`
+- `src/agents/pi-tools.ts`
 
 ### Decision mapping
 
@@ -221,24 +239,6 @@ This package intentionally normalizes AGT policy actions into the smaller decisi
 | `require_approval` | `review` |
 | `warn` | `review` |
 | `log` | `allow` |
-
----
-
-## 4. Register the hook in `src/agents/pi-tools.ts`
-
-Once the hook exists, attach it where OpenClaw wraps tools:
-
-```ts
-import { beforeToolCallHook } from "./pi-tools.before-tool-call";
-
-export function buildGovernedTools(tools: Array<any>) {
-  return tools.map((tool) =>
-    wrapToolWithBeforeToolCallHook(tool, beforeToolCallHook),
-  );
-}
-```
-
-The exact wrapper signature can vary by OpenClaw version. The important part is that the adapter runs inside the same interception path OpenClaw already uses before a tool executes.
 
 ---
 

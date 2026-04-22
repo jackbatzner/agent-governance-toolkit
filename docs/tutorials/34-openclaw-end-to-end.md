@@ -5,7 +5,7 @@ Build and test a full OpenClaw + AGT flow using the OpenClaw adapter package, th
 This tutorial is the **follow-along path** for platform engineers and OpenClaw developers who want one place to cover:
 
 1. installing the adapter and SDK
-2. wiring the `before_tool_call` hook
+2. registering the adapter with the OpenClaw SDK `before_tool_call` surface
 3. scanning MCP tool definitions
 4. exporting audits
 5. building the OpenClaw deployment artifact
@@ -43,10 +43,8 @@ You need:
 
 - a working OpenClaw checkout
 - Node.js 18+
-- access to the OpenClaw files that currently host tool interception:
-  - `src/agents/pi-tools.ts`
-  - `src/agents/pi-tools.before-tool-call.ts`
-  - `wrapToolWithBeforeToolCallHook(...)`
+- access to the OpenClaw SDK or plugin surface that lets you intercept tool calls before execution
+- only if you are maintaining OpenClaw itself: access to the underlying interception files and wrappers
 
 If you are also testing on AKS, you additionally need:
 
@@ -166,74 +164,70 @@ export const governance = createOpenClawGovernanceAdapter({
 });
 ```
 
-## Step 3: wire the `before_tool_call` hook
+## Step 3: register the adapter with the OpenClaw SDK
 
-Use the adapter in `src/agents/pi-tools.before-tool-call.ts`.
+Use the adapter anywhere the OpenClaw SDK exposes a `before_tool_call` registration surface.
 
 ```ts
 import { governance } from "./governance";
 
-export async function beforeToolCallHook({
-  tool,
-  args,
-  requestId,
-  sessionId,
-  userId,
-}: {
-  tool: { name: string; description?: string };
-  args: Record<string, unknown>;
-  requestId?: string;
-  sessionId?: string;
-  userId?: string;
+export function registerGovernanceWithOpenClaw(openclawSdk: {
+  registerBeforeToolCallHook: (
+    hook: (input: {
+      tool: { name: string; description?: string };
+      args: Record<string, unknown>;
+      requestId?: string;
+      sessionId?: string;
+      userId?: string;
+    }) => Promise<unknown>,
+  ) => void;
 }) {
-  const result = await governance.evaluateBeforeToolCall({
-    toolName: tool.name,
-    toolDescription: tool.description,
-    params: args,
-    requestId,
-    sessionId,
-    userId,
+  openclawSdk.registerBeforeToolCallHook(async ({ tool, args, requestId, sessionId, userId }) => {
+    const result = await governance.evaluateBeforeToolCall({
+      toolName: tool.name,
+      toolDescription: tool.description,
+      params: args,
+      requestId,
+      sessionId,
+      userId,
+    });
+
+    if (result.decision === "deny") {
+      return {
+        block: true,
+        reason: result.reason ?? "Blocked by governance policy.",
+      };
+    }
+
+    if (result.decision === "review") {
+      return {
+        block: true,
+        requiresApproval: true,
+        reason: result.reason ?? "Approval required by governance policy.",
+        metadata: {
+          approvers: result.approvers,
+          matchedRule: result.matchedRule,
+          policyName: result.policyName,
+        },
+      };
+    }
+
+    return {
+      args: result.rewrittenParams ?? args,
+    };
   });
-
-  if (result.decision === "deny") {
-    return {
-      block: true,
-      reason: result.reason ?? "Blocked by governance policy.",
-    };
-  }
-
-  if (result.decision === "review") {
-    return {
-      block: true,
-      requiresApproval: true,
-      reason: result.reason ?? "Approval required by governance policy.",
-      metadata: {
-        approvers: result.approvers,
-        matchedRule: result.matchedRule,
-        policyName: result.policyName,
-      },
-    };
-  }
-
-  return {
-    args: result.rewrittenParams ?? args,
-  };
 }
 ```
 
-## Step 4: attach the hook in tool assembly
+> **Note:** `registerBeforeToolCallHook(...)` is illustrative. Use the actual registration API exposed by your OpenClaw SDK version.
 
-Register the governed hook in `src/agents/pi-tools.ts`.
+## Step 4: keep source edits as a fallback only
 
-```ts
-import { beforeToolCallHook } from "./pi-tools.before-tool-call";
+If your OpenClaw SDK does **not** expose a native registration surface yet, the same callback can be wired into the underlying interception path used by OpenClaw maintainers:
 
-export function buildGovernedTools(tools: Array<any>) {
-  return tools.map((tool) =>
-    wrapToolWithBeforeToolCallHook(tool, beforeToolCallHook),
-  );
-}
-```
+- `src/agents/pi-tools.ts`
+- `src/agents/pi-tools.before-tool-call.ts`
+- `wrapToolWithBeforeToolCallHook(...)`
 
 ## Step 5: scan MCP tool definitions before registration
 
