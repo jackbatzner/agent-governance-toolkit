@@ -49,7 +49,17 @@ AgentMesh core is a lean, zero-external-dependency library. Platform integration
 | [Moltbook](moltbook/) | — | ✅ Stable | AgentMesh governance skill for [Moltbook](https://moltbook.com) agent registry |
 | [Nostr Web of Trust](nostr-wot/) | `agentmesh-nostr-wot` | 🚧 Scaffold | Trust scoring via [MaximumSats](https://github.com/joelklabo/maximumsats-mcp) NIP-85 WoT |
 | [OpenAI Agents](openai-agents-trust/) | [`openai-agents-trust`](https://pypi.org/project/openai-agents-trust/) | ✅ Published (PyPI) | Trust guardrails, policy enforcement, governance hooks, trust-gated handoffs for OpenAI Agents SDK |
+| [OpenClaw Adapter](openclaw-agentmesh/) | `@microsoft/agentmesh-openclaw` | 🚧 In Repo | In-process TypeScript adapter for OpenClaw's `before_tool_call` hook — policy evaluation, audit logging, MCP tool-definition scanning |
 | [OpenClaw Skill](openclaw-skill/) | [`agentmesh-governance`](https://clawhub.ai/microsoft/agentmesh-governance) | ✅ Published (ClawHub) | Governance skill for [OpenClaw](https://openclaw.im) agents — policy enforcement, trust scoring, Ed25519 DIDs, hash-chain audit |
+
+### OpenClaw operator docs
+
+If you are deploying OpenClaw with AGT, start with these docs:
+
+- [`openclaw-agentmesh/README.md`](openclaw-agentmesh/) — package install, hook wiring, approvals, MCP scan, audit logging
+- [`docs/integrations/openclaw-adapter.md`](../../docs/integrations/openclaw-adapter.md) — deployment choices and integration model
+- [`docs/deployment/openclaw-aks-protection.md`](../../docs/deployment/openclaw-aks-protection.md) — AKS protection guidance
+- [`docs/deployment/openclaw-sidecar.md`](../../docs/deployment/openclaw-sidecar.md) — HTTP sidecar pattern
 
 ## Quick Start
 

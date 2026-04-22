@@ -6,5 +6,6 @@ Deploy AGT across Azure services and container platforms.
 |-------|----------|
 | [Azure Container Apps](azure-container-apps.md) | Managed containers on Azure |
 | [Azure Foundry Agent Service](azure-foundry-agent-service.md) | Foundry-native agent hosting |
+| [OpenClaw AKS Protection](openclaw-aks-protection.md) | AKS guidance for policy mounts, audit export, network boundaries, and workload identity |
 | [OpenClaw Sidecar](openclaw-sidecar.md) | Sidecar deployment pattern |
 | [Private Endpoints](private-endpoints.md) | Secure networking with private links |

@@ -1,0 +1,53 @@
+{
+  "name": "@microsoft/agentmesh-openclaw",
+  "version": "0.1.0",
+  "description": "Public Preview — Governance adapter for OpenClaw built on @microsoft/agentmesh-sdk",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "openclaw",
+    "agentmesh",
+    "governance",
+    "policy",
+    "audit",
+    "mcp",
+    "typescript"
+  ],
+  "author": "Microsoft Corporation",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/agent-governance-toolkit.git",
+    "directory": "packages/agentmesh-integrations/openclaw-agentmesh"
+  },
+  "homepage": "https://github.com/microsoft/agent-governance-toolkit/tree/main/packages/agentmesh-integrations/openclaw-agentmesh",
+  "peerDependencies": {
+    "@microsoft/agentmesh-sdk": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.0.0",
+    "tsup": "8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "3.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  }
+}

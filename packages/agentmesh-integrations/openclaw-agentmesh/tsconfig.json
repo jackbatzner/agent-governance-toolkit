@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "outDir": "dist",
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@microsoft/agentmesh-sdk/audit": ["../../agent-mesh/sdks/typescript/src/audit.ts"],
+      "@microsoft/agentmesh-sdk/mcp": ["../../agent-mesh/sdks/typescript/src/mcp.ts"],
+      "@microsoft/agentmesh-sdk/policy": ["../../agent-mesh/sdks/typescript/src/policy.ts"],
+      "@microsoft/agentmesh-sdk/types": ["../../agent-mesh/sdks/typescript/src/types.ts"]
+    },
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
+}

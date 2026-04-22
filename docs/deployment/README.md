@@ -18,21 +18,20 @@ Deploy the Agent Governance Toolkit on any cloud or on-premises infrastructure.
 | **Azure Kubernetes Service (AKS)** | [AKS Sidecar Deployment](../../packages/agent-mesh/docs/deployment/azure.md) | Production multi-agent systems, enterprise HA |
 | **Azure AI Foundry Agent Service** | [Foundry Integration](azure-foundry-agent-service.md) | Agents built with Azure AI Foundry |
 | **Azure Container Apps** | [Container Apps](azure-container-apps.md) | Serverless, scale-to-zero scenarios |
-| **OpenClaw on AKS** | [OpenClaw Sidecar](openclaw-sidecar.md) | Governing OpenClaw autonomous agents |
+| **OpenClaw on AKS** | [OpenClaw AKS Protection](openclaw-aks-protection.md) | Governing OpenClaw autonomous agents on AKS |
+| **OpenClaw Sidecar Pattern** | [OpenClaw Sidecar](openclaw-sidecar.md) | HTTP sidecar deployment model for OpenClaw |
 
 ### AWS
 
 | Scenario | Guide | Best For |
 |----------|-------|----------|
 | **AWS ECS / Fargate** | [ECS Deployment](aws-ecs.md) | Serverless containers, simple agent deployments |
-| **AWS EKS** | [ECS Guide](aws-ecs.md) (Kubernetes section) | Production multi-agent on Kubernetes |
 
 ### Google Cloud
 
 | Scenario | Guide | Best For |
 |----------|-------|----------|
 | **Google Kubernetes Engine (GKE)** | [GKE Deployment](gcp-gke.md) | Production multi-agent on GKE |
-| **Cloud Run** | [GKE Guide](gcp-gke.md) (Cloud Run section) | Serverless container workloads |
 
 ### Self-Hosted / On-Premises
 

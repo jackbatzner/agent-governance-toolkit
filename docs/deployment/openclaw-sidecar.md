@@ -1,29 +1,45 @@
-# Securing OpenClaw with the Agent Governance Toolkit
+# OpenClaw Sidecar Pattern
 
-Deploy OpenClaw as an autonomous agent with the Agent Governance Toolkit as a sidecar on Azure Kubernetes Service (AKS) for prompt injection detection, governance API access, and action auditing.
+This page documents the **HTTP sidecar** deployment pattern for OpenClaw. Use it when you want AGT exposed as a local governance service next to OpenClaw rather than only as an in-process adapter.
 
 > [!WARNING]
 > **Known limitations — read before deploying:**
 > - OpenClaw does **not** natively call the governance sidecar. Your orchestration layer must call the sidecar HTTP API explicitly before executing tools.
+> - If you want **in-process** governance inside OpenClaw's existing `before_tool_call` path instead of a sidecar hop, use [`@microsoft/agentmesh-openclaw`](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md).
 > - The docker-compose example in this doc is for illustration. For a working local demo, use [`demo/openclaw-governed/`](../../demo/openclaw-governed/).
 > - See [Roadmap](#roadmap) for the full list of unimplemented features.
 
-> **Container images** are published to `ghcr.io/microsoft/agentmesh/`. See [Container Images](../../packages/agent-mesh/docs/deployment/azure.md#container-images) for the full list.
+> **Container images:** AGT publishes container images to `ghcr.io/microsoft/agentmesh/`. This page still assumes you build or mirror the specific sidecar image you plan to run in your own registry. See [Container Images](../../packages/agent-mesh/docs/deployment/azure.md#container-images) for the broader image catalog.
 
-> **See also:** [Deployment Overview](README.md) | [AKS Deployment](../../packages/agent-mesh/docs/deployment/azure.md) | [OpenShell Integration](../integrations/openshell.md)
+> **See also:** [OpenClaw adapter guide](../integrations/openclaw-adapter.md) | [OpenClaw AKS protection guidance](openclaw-aks-protection.md) | [AKS deployment](../../packages/agent-mesh/docs/deployment/azure.md) | [OpenShell integration](../integrations/openshell.md) | [OpenClaw adapter README](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md)
+
+---
+
+## Choose the right OpenClaw deployment pattern
+
+| Pattern | What AGT protects | What OpenClaw still owns |
+|---|---|---|
+| **In-process adapter only** | Tool-call governance in OpenClaw's `before_tool_call` path | Runtime isolation, approval workflow, audit export |
+| **Adapter + sidecar** | In-process governance plus a local governance HTTP service | Explicit wiring between OpenClaw and the sidecar, ingress design |
+| **Adapter + shared governance service** | In-process governance with centrally managed policy or audit backends | Network path, service auth, approval systems |
+
+This page focuses on the **sidecar** column. For the in-process wiring flow, use the [OpenClaw adapter guide](../integrations/openclaw-adapter.md). For production AKS boundaries, use the [AKS protection guide](openclaw-aks-protection.md).
 
 ---
 
 ## Table of Contents
 
 - [Why Govern OpenClaw?](#why-govern-openclaw)
+- [Choose the right OpenClaw deployment pattern](#choose-the-right-openclaw-deployment-pattern)
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Quick Start with Docker Compose](#quick-start-with-docker-compose)
 - [Production Deployment on AKS](#production-deployment-on-aks)
-- [Governance Policies for OpenClaw](#governance-policies-for-openclaw)
-- [Monitoring and SLOs](#monitoring-and-slos)
+- [Sidecar API Endpoints](#sidecar-api-endpoints)
+- [Monitoring](#monitoring)
+- [Roadmap](#roadmap)
 - [Troubleshooting](#troubleshooting)
+- [Next Steps](#next-steps)
 
 ---
 
@@ -104,7 +120,11 @@ open http://localhost:8081/docs
 > your OpenClaw instance, configure your agent's tool-call pipeline to call
 > the sidecar API (`http://localhost:8081/api/v1/execute`) before executing
 > actions. OpenClaw does **not** natively read a `GOVERNANCE_API` env var —
-> the integration must be explicit in your orchestration layer.
+> the integration must be explicit in your orchestration layer. If you want
+> governance to run in-process inside OpenClaw's existing interception path,
+> follow the adapter setup guide in
+> [`packages/agentmesh-integrations/openclaw-agentmesh/README.md`](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md)
+> instead of this sidecar-only flow.
 
 ### Docker Compose with OpenClaw (reference)
 
