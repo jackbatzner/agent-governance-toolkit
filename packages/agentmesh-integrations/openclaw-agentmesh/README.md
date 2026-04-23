@@ -6,7 +6,7 @@ This package is the **in-process** OpenClaw integration path:
 
 - **OpenClaw** remains the runtime and tool-execution plane.
 - **Agent Governance Toolkit (AGT)** evaluates policy before a tool runs, scans MCP tool definitions, and records audit events.
-- **Your OpenClaw deployment** decides how to load policies, route human approvals, persist audits, and apply runtime isolation.
+- **Your OpenClaw deployment** owns approval UX, audit export, and runtime isolation. This package now ships both a native OpenClaw plugin entry and lower-level hook helpers.
 
 For broader deployment guidance, see:
 
@@ -18,10 +18,16 @@ For broader deployment guidance, see:
 ## Install
 
 ```bash
+npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
+```
+
+If you want OpenClaw to install it through the plugin system:
+
+```bash
 openclaw plugins install @microsoft/agentmesh-openclaw
 ```
 
-If you are developing locally or installing without the OpenClaw plugin installer:
+Or install it directly with npm:
 
 ```bash
 npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
@@ -29,10 +35,14 @@ npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
 
 ## What this package gives you
 
-- a **native OpenClaw plugin entry** that registers `before_tool_call` and `after_tool_call` hooks
 - `createOpenClawGovernanceAdapter()` — reusable adapter instance for OpenClaw tool governance
-- `createOpenClawGovernanceAdapterFromPluginConfig()` — adapter construction from native plugin config
-- `registerOpenClawGovernanceHooks()` — manual hook registration for advanced/custom plugin setups
+- `createOpenClawGovernanceAdapterFromConfig()` — adapter construction from a file-backed or inline hook config
+- a **native OpenClaw plugin entry** at `@microsoft/agentmesh-openclaw/plugin`
+- `registerOpenClawPluginHooks()` — hook registration through the real OpenClaw plugin API
+- `createOpenClawBeforeToolCallInputFromHookEvent()` — best-effort mapping from OpenClaw `InternalHookEvent` into AGT before-call input
+- `createOpenClawAfterToolCallInputFromHookEvent()` — best-effort mapping from OpenClaw `InternalHookEvent` into AGT after-call input
+- `applyBeforeToolCallResultToHookEvent()` — writes allow/deny/review outcomes back onto the mutable hook event
+- `processOpenClawHookEvent()` / `createOpenClawHookEventHandler()` — one-call helpers for common hook handlers
 - `evaluateBeforeToolCall()` — policy evaluation before OpenClaw executes a tool
 - `recordAfterToolCall()` — post-execution audit logging for success/error outcomes
 - `scanMcpToolDefinition()` / `scanMcpToolDefinitions()` — MCP tool-definition scanning before tool registration or use
@@ -46,69 +56,61 @@ npm install @microsoft/agentmesh-openclaw @microsoft/agentmesh-sdk
 
 ## Preferred setup path
 
-For most developers, the easiest setup is:
+For most developers, the best setup is:
 
 1. install `@microsoft/agentmesh-openclaw` into the OpenClaw app
-2. point the plugin at a policy bundle with `plugins.entries.agentmesh-openclaw.config.policyFile`
-3. let the native plugin entry register `before_tool_call` and `after_tool_call`
-4. route OpenClaw approvals and audit export the same way you already operate the host runtime
+2. keep a JSON policy bundle in the OpenClaw repo
+3. let the native plugin entry register the `before_tool_call` and `after_tool_call` hooks
+4. route `allow | deny | review` into the same OpenClaw runtime flow you already operate
 
 ### Runtime flow
 
 ```text
-OpenClaw tool request
+OpenClaw plugin runtime
     |
-    v
-before_tool_call hook
-    |
-    v
-@microsoft/agentmesh-openclaw
-    |
-    +--> normalize tool-call context
-    +--> call AGT policy engine
-    +--> map result to allow | deny | review
-    |
-    v
-OpenClaw enforces the result
-    |
-    +--> allow  -> execute tool
-    +--> deny   -> block tool
-    +--> review -> native approval flow
-    |
-    v
-after_tool_call hook (when audit is enabled)
-    |
-    v
-AGT audit logging
+    +--> @microsoft/agentmesh-openclaw/plugin
+            |
+            +--> api.registerHook("before_tool_call", ...)
+            +--> api.registerHook("after_tool_call", ...)
+            |
+            v
+        AGT adapter core
+            |
+            +--> normalize hook payload
+            +--> call AGT policy engine
+            +--> map result to allow | deny | review
+            |
+            v
+        OpenClaw enforces the result
 ```
 
 Truthful boundary:
 
-- the native plugin **does** register `before_tool_call` and `after_tool_call`
-- the native plugin **does not** auto-scan every tool catalog; use `scanMcpToolDefinition()` / `scanMcpToolDefinitions()` explicitly where you assemble tools
+- the package **does** ship a real OpenClaw plugin entry and manifest
+- the package **does** also expose lower-level helpers for direct hook processing when you need them
+- the package **does not** auto-discover every tool catalog
 - OpenClaw still owns execution, approval UX, retries, and sandboxing
 
 ### Underlying hook references
 
-If you maintain OpenClaw itself or need a source-level fallback, the known underlying interception points are:
+If you maintain OpenClaw itself, the known underlying interception points are:
 
 - `src/agents/pi-tools.ts`
 - `src/agents/pi-tools.before-tool-call.ts`
 - `wrapToolWithBeforeToolCallHook(...)`
 
-The adapter is designed to fit that same interception model even when registration happens through an SDK surface instead of direct source edits.
+This package is designed to fit that interception model directly.
 
 ---
 
 ## Setup checklist
 
 1. Define a governance policy bundle for the tools you expose.
-2. Install and enable the native OpenClaw plugin entry.
-3. Configure `policyFile` and optional audit settings in `plugins.entries.agentmesh-openclaw.config`.
-4. Treat the source-level hook path as a maintainer fallback, not the normal app-developer path.
-5. Route `review` decisions into your approval workflow.
-6. Scan MCP tool definitions before registration.
-7. Export post-call audits to a durable sink.
+2. Install `@microsoft/agentmesh-openclaw` and `@microsoft/agentmesh-sdk`.
+3. Wire your OpenClaw hook code to call the adapter helpers.
+4. Route `review` decisions into your approval workflow.
+5. Scan MCP tool definitions before registration.
+6. Export post-call audits to a durable sink.
 
 ---
 
@@ -169,72 +171,91 @@ If your team stores policy in YAML or a database, load and parse it before adapt
 
 ---
 
-## 2. Enable the native OpenClaw plugin
+## 2. Wire the OpenClaw hook
 
-The package now ships a real OpenClaw plugin entry and manifest, so the default path no longer needs a custom bootstrap module.
+The tested OpenClaw surface is the generic hook event shape:
 
-Add plugin config in your OpenClaw configuration:
+```ts
+export interface InternalHookEvent {
+  type: string;
+  action: string;
+  sessionKey: string;
+  context: Record<string, unknown>;
+  timestamp: Date;
+  messages: string[];
+}
+```
 
-```json
-{
-  "plugins": {
-    "entries": {
-      "agentmesh-openclaw": {
-        "config": {
-          "policyFile": "./config/openclaw-governance.policies.json",
-          "agentId": "openclaw-main-agent",
-          "agentDid": "did:agentmesh:openclaw-main-agent",
-          "audit": {
-            "enabled": true,
-            "stdout": true,
-            "maxEntries": 5000
-          }
-        }
-      }
-    }
+That means the normal integration path is **explicit hook wiring**, not native plugin auto-registration.
+
+### Minimal hook wiring
+
+```ts
+import {
+  createOpenClawGovernanceAdapterFromConfig,
+  createOpenClawHookEventHandler,
+} from "@microsoft/agentmesh-openclaw";
+
+const governance = createOpenClawGovernanceAdapterFromConfig({
+  policyFile: "./config/openclaw-governance.policies.json",
+  agentId: "openclaw-main-agent",
+  agentDid: "did:agentmesh:openclaw-main-agent",
+  audit: {
+    enabled: true,
+    stdout: true,
+    maxEntries: 5000,
+  },
+});
+
+export const onInternalHookEvent = createOpenClawHookEventHandler(governance);
+```
+
+### Explicit before/after wiring
+
+Use this shape when you want full control over mapping and enforcement:
+
+```ts
+import {
+  applyBeforeToolCallResultToHookEvent,
+  createOpenClawAfterToolCallInputFromHookEvent,
+  createOpenClawBeforeToolCallInputFromHookEvent,
+  createOpenClawGovernanceAdapterFromConfig,
+} from "@microsoft/agentmesh-openclaw";
+import type { InternalHookEvent } from "./hooks";
+
+const governance = createOpenClawGovernanceAdapterFromConfig({
+  policyFile: "./config/openclaw-governance.policies.json",
+  audit: {
+    enabled: true,
+    stdout: true,
+  },
+});
+
+export async function onInternalHookEvent(event: InternalHookEvent) {
+  const beforeInput = createOpenClawBeforeToolCallInputFromHookEvent(event);
+  if (beforeInput) {
+    const result = await governance.evaluateBeforeToolCall(beforeInput);
+    applyBeforeToolCallResultToHookEvent(event, result);
+    return;
+  }
+
+  const afterInput = createOpenClawAfterToolCallInputFromHookEvent(event);
+  if (afterInput && governance.auditLogger) {
+    await governance.recordAfterToolCall(afterInput);
   }
 }
 ```
 
-What the native plugin entry does:
+### What the helper expects in `event.context`
 
-- loads the configured JSON policy bundle
-- registers `before_tool_call` and `after_tool_call` hooks
-- maps AGT policy actions into OpenClaw `allow | deny | review` behavior
-- emits audit records to stdout when `audit.stdout` is enabled
+The default hook mappers look for common fields in `event.context`:
 
----
+- `toolName` (or `tool.name` / `name`)
+- `params` (or `arguments`, `args`, `input`)
+- optional `agentId`, `agentDid`, `toolCallId`, `requestId`, `runId`
+- optional `result`, `error`, `durationMs` on after-tool events
 
-## 3. Advanced: register hooks manually
-
-If you are building a custom OpenClaw plugin package and want direct control over hook registration, use the exported helper instead of reimplementing the mapping yourself:
-
-```ts
-import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { registerOpenClawGovernanceHooks } from "@microsoft/agentmesh-openclaw";
-
-export default definePluginEntry({
-  id: "custom-governance-wrapper",
-  name: "Custom Governance Wrapper",
-  description: "Registers AGT governance hooks through a custom plugin entry.",
-  register(api) {
-    registerOpenClawGovernanceHooks(api, {
-      policyFile: "./config/openclaw-governance.policies.json",
-      audit: {
-        enabled: true,
-        stdout: true,
-      },
-    });
-  },
-});
-```
-
-### Source-level fallback
-
-If your OpenClaw deployment does **not** expose a native SDK/plugin registration surface yet, wire the same callback into the underlying hook path in:
-
-- `src/agents/pi-tools.before-tool-call.ts`
-- `src/agents/pi-tools.ts`
+If your OpenClaw deployment uses different context field names, build `OpenClawBeforeToolCallInput` and `OpenClawAfterToolCallInput` yourself and call `evaluateBeforeToolCall()` / `recordAfterToolCall()` directly.
 
 ### Decision mapping
 
@@ -250,16 +271,16 @@ This package intentionally normalizes AGT policy actions into the smaller decisi
 
 ---
 
-## 5. Wire review and approval handling
+## 3. Wire review and approval handling
 
 When the adapter returns `review`, AGT is telling OpenClaw that the call should stop until a human or approval service responds.
 
 Recommended flow:
 
-1. `beforeToolCallHook()` returns `requiresApproval: true`.
-2. OpenClaw stores the pending request and shows its native approval surface.
-3. Your approval system notifies the listed approvers.
-4. Only after approval do you re-run or resume the tool call.
+1. your hook writes approval metadata onto the mutable event context
+2. OpenClaw stores the pending request and shows its native approval surface
+3. your approval system notifies the listed approvers
+4. only after approval do you re-run or resume the tool call
 
 What AGT provides:
 
@@ -276,7 +297,7 @@ What OpenClaw or your platform must provide:
 
 ---
 
-## 6. Enable MCP tool-definition scanning before registration
+## 4. Enable MCP tool-definition scanning before registration
 
 OpenClaw assembles tools centrally in `src/agents/pi-tools.ts`, which is also the right place to scan tool definitions before they are wrapped and exposed:
 
@@ -306,9 +327,7 @@ export function validateAndWrapTools(
     }
   }
 
-  return tools.map((tool) =>
-    wrapToolWithBeforeToolCallHook(tool, beforeToolCallHook),
-  );
+  return tools;
 }
 ```
 
@@ -316,11 +335,9 @@ Use `scanMcpToolDefinitions()` instead if you want to evaluate the full catalog 
 
 ---
 
-## 7. Record post-call audit events
+## 5. Record post-call audit events
 
-The native plugin entry registers `after_tool_call` automatically when audit logging is enabled.
-
-If you need to override that behavior in a custom entry, call `recordAfterToolCall()` yourself from your own `after_tool_call` hook implementation.
+If audit logging is enabled, call `recordAfterToolCall()` from your `after_tool_call` hook path or use `createOpenClawHookEventHandler()`.
 
 ### Production note on audit persistence
 
@@ -364,16 +381,20 @@ Creates a reusable adapter instance with:
 - `scanMcpToolDefinition(tool)`
 - `scanMcpToolDefinitions(tools)`
 
-### `evaluateBeforeToolCall(input, adapterOrConfig)`
+### `createOpenClawGovernanceAdapterFromConfig(config)`
 
-Standalone helper if you prefer not to hold the adapter instance yourself.
+Creates the adapter from a hook-oriented config object that can include `policyFile`, inline `policies`, `agentId`, `agentDid`, and audit settings.
 
-### `recordAfterToolCall(input, adapterOrConfig)`
+### `processOpenClawHookEvent(event, adapterOrConfig)`
 
-Records the post-call outcome with the configured audit logger.
+Processes an OpenClaw `InternalHookEvent` directly. It recognizes `before_tool_call` and `after_tool_call`, applies before-call decisions back onto the mutable event, and records after-call audits when enabled.
+
+### `createOpenClawHookEventHandler(adapterOrConfig)`
+
+Returns an async `(event) => ...` handler you can drop into your own OpenClaw hook pipeline.
 
 ## Notes
 
-- Use this package when you want **native in-process enforcement** inside OpenClaw's existing tool hook.
+- Use this package when you want **in-process enforcement** inside OpenClaw's existing tool hook.
 - Use the sidecar docs when you want **HTTP-accessible governance infrastructure** next to or near OpenClaw.
 - Use the AKS protection guide when you need to decide how to mount policies, export audits, and set network and identity boundaries in production.

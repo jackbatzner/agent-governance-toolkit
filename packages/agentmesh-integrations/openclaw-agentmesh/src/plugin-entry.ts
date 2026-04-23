@@ -1,7 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
-import { registerOpenClawGovernanceHooks } from "./adapter";
+import { registerOpenClawPluginHooks } from "./adapter";
+import type { OpenClawPluginApi } from "./types";
 
 export const openClawGovernancePluginConfigSchema = {
   type: "object",
@@ -28,7 +29,7 @@ export const openClawGovernancePluginConfigSchema = {
     },
     failClosed: {
       type: "boolean",
-      description: "When true, policy/audit failures deny tool execution instead of throwing.",
+      description: "When true, policy and audit failures deny tool execution instead of throwing.",
     },
     audit: {
       type: "object",
@@ -54,9 +55,9 @@ export const openClawGovernancePluginConfigSchema = {
 export default definePluginEntry({
   id: "agentmesh-openclaw",
   name: "AgentMesh OpenClaw Governance",
-  description: "Public Preview — Native OpenClaw plugin entry for AGT policy enforcement and audit hooks.",
+  description: "Public Preview — OpenClaw plugin for AGT policy enforcement, MCP scanning, and audit hooks.",
   configSchema: openClawGovernancePluginConfigSchema,
-  register(api) {
-    registerOpenClawGovernanceHooks(api);
+  register(api: OpenClawPluginApi) {
+    registerOpenClawPluginHooks(api);
   },
 });

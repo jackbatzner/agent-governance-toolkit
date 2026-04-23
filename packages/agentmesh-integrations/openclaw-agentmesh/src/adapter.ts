@@ -18,22 +18,23 @@ import type {
   OpenClawAfterToolCallInput,
   OpenClawAfterToolCallResult,
   OpenClawAuditLogger,
+  OpenClawBeforeToolCallHookDecision,
   OpenClawBeforeToolCallInput,
   OpenClawBeforeToolCallResult,
   OpenClawGovernanceAdapter,
   OpenClawGovernanceAdapterConfig,
   OpenClawGovernanceDecision,
+  OpenClawHookConfig,
+  OpenClawHookProcessingResult,
+  OpenClawInternalHookEvent,
   OpenClawMcpScanResult,
-  OpenClawNativeAfterToolCallEvent,
-  OpenClawNativeBeforeToolCallEvent,
-  OpenClawNativeBeforeToolCallResult,
-  OpenClawNativePluginApi,
-  OpenClawNativePluginConfig,
-  OpenClawNativeToolHookContext,
+  OpenClawPluginApi,
   OpenClawPolicyEngine,
 } from "./types";
 
-const OPENCLAW_NATIVE_PLUGIN_ID = "agentmesh-openclaw";
+const OPENCLAW_HOOK_PLUGIN_ID = "agentmesh-openclaw";
+const BEFORE_TOOL_CALL_ACTIONS = new Set(["before_tool_call", "before-tool-call", "beforeToolCall"]);
+const AFTER_TOOL_CALL_ACTIONS = new Set(["after_tool_call", "after-tool-call", "afterToolCall"]);
 
 interface ResolvedAdapterRuntime {
   agentId?: string;
@@ -62,13 +63,13 @@ export function createOpenClawGovernanceAdapter(
   };
 }
 
-export function createOpenClawGovernanceAdapterFromPluginConfig(
-  config: OpenClawNativePluginConfig,
+export function createOpenClawGovernanceAdapterFromConfig(
+  config: OpenClawHookConfig,
   options?: {
     cwd?: string;
   },
 ): OpenClawGovernanceAdapter {
-  const resolved = resolveNativePluginConfig(config, options?.cwd);
+  const resolved = resolveHookConfig(config, options?.cwd);
   return createOpenClawGovernanceAdapter({
     agentId: resolved.agentId,
     agentDid: resolved.agentDid,
@@ -78,85 +79,317 @@ export function createOpenClawGovernanceAdapterFromPluginConfig(
   });
 }
 
+export function createOpenClawGovernanceAdapterFromPluginConfig(
+  pluginConfig: Record<string, unknown> | undefined,
+  options?: {
+    cwd?: string;
+  },
+): OpenClawGovernanceAdapter {
+  return createOpenClawGovernanceAdapterFromConfig(
+    normalizeNativePluginConfig(pluginConfig),
+    options,
+  );
+}
+
 export async function evaluateBeforeToolCall(
   input: OpenClawBeforeToolCallInput,
-  adapterOrConfig: OpenClawGovernanceAdapter | OpenClawGovernanceAdapterConfig,
+  adapterOrConfig:
+    | OpenClawGovernanceAdapter
+    | OpenClawGovernanceAdapterConfig
+    | OpenClawHookConfig,
 ): Promise<OpenClawBeforeToolCallResult> {
   return resolveAdapter(adapterOrConfig).evaluateBeforeToolCall(input);
 }
 
 export async function recordAfterToolCall(
   input: OpenClawAfterToolCallInput,
-  adapterOrConfig: OpenClawGovernanceAdapter | OpenClawGovernanceAdapterConfig,
+  adapterOrConfig:
+    | OpenClawGovernanceAdapter
+    | OpenClawGovernanceAdapterConfig
+    | OpenClawHookConfig,
 ): Promise<OpenClawAfterToolCallResult> {
   return resolveAdapter(adapterOrConfig).recordAfterToolCall(input);
 }
 
 export function scanOpenClawMcpToolDefinition(
   toolDefinition: McpToolDefinition,
-  adapterOrConfig: OpenClawGovernanceAdapter | OpenClawGovernanceAdapterConfig,
+  adapterOrConfig:
+    | OpenClawGovernanceAdapter
+    | OpenClawGovernanceAdapterConfig
+    | OpenClawHookConfig,
 ): OpenClawMcpScanResult {
   return resolveAdapter(adapterOrConfig).scanMcpToolDefinition(toolDefinition);
 }
 
 export function scanOpenClawMcpToolDefinitions(
   toolDefinitions: McpToolDefinition[],
-  adapterOrConfig: OpenClawGovernanceAdapter | OpenClawGovernanceAdapterConfig,
+  adapterOrConfig:
+    | OpenClawGovernanceAdapter
+    | OpenClawGovernanceAdapterConfig
+    | OpenClawHookConfig,
 ): OpenClawMcpScanResult[] {
   return resolveAdapter(adapterOrConfig).scanMcpToolDefinitions(toolDefinitions);
 }
 
-export function registerOpenClawGovernanceHooks(
-  api: OpenClawNativePluginApi,
-  config?: OpenClawNativePluginConfig,
-): OpenClawGovernanceAdapter {
-  const resolvedConfig = resolveNativePluginConfig(config ?? normalizeNativePluginConfig(api.pluginConfig));
-  const adapter = createOpenClawGovernanceAdapter({
-    agentId: resolvedConfig.agentId,
-    agentDid: resolvedConfig.agentDid,
-    policies: resolvedConfig.policies,
-    failClosed: resolvedConfig.failClosed,
-    audit: resolvedConfig.audit,
-  });
+export function createOpenClawBeforeToolCallInputFromHookEvent(
+  event: OpenClawInternalHookEvent | Record<string, unknown>,
+): OpenClawBeforeToolCallInput | null {
+  if (isInternalHookEvent(event)) {
+    if (!BEFORE_TOOL_CALL_ACTIONS.has(event.action)) {
+      return null;
+    }
 
-  api.registerHook(
-    "before_tool_call",
-    async (event, ctx) => {
-      const beforeToolCallEvent = event as OpenClawNativeBeforeToolCallEvent;
-      return mapBeforeToolCallResult(
-        await adapter.evaluateBeforeToolCall(
-          mapBeforeToolCallEvent(
-            beforeToolCallEvent,
-            ctx as OpenClawNativeToolHookContext,
-          ),
-        ),
-        beforeToolCallEvent.toolName,
-      );
+    const toolName = readToolName(event.context);
+    if (!toolName) {
+      return null;
+    }
+
+    return {
+      toolName,
+      params: readParams(event.context),
+      toolDescription: readStringFromContext(event.context, ["toolDescription", "description"]),
+      requestId: readStringFromContext(event.context, ["toolCallId", "requestId", "runId", "id"]),
+      sessionId: event.sessionKey,
+      userId: readStringFromContext(event.context, ["userId"]),
+      agentId: readStringFromContext(event.context, ["agentId"]),
+      agentDid: readStringFromContext(event.context, ["agentDid"]),
+      metadata: {
+        hookType: event.type,
+        hookAction: event.action,
+        hookTimestamp: event.timestamp.toISOString(),
+      },
+      runtimeContext: { ...event.context },
+    };
+  }
+
+  const toolName = readToolName(event);
+  if (!toolName) {
+    return null;
+  }
+
+  return {
+    toolName,
+    params: readParams(event),
+    toolDescription: readStringFromContext(event, ["toolDescription", "description"]),
+    requestId: readStringFromContext(event, ["toolCallId", "requestId", "runId", "id"]),
+    sessionId: readStringFromContext(event, ["sessionId", "sessionKey"]),
+    userId: readStringFromContext(event, ["userId"]),
+    agentId: readStringFromContext(event, ["agentId"]),
+    agentDid: readStringFromContext(event, ["agentDid"]),
+    metadata: {
+      hookType: "before_tool_call",
+      hookAction: "before_tool_call",
     },
+    runtimeContext: { ...event },
+  };
+}
+
+export function createOpenClawAfterToolCallInputFromHookEvent(
+  event: OpenClawInternalHookEvent | Record<string, unknown>,
+): OpenClawAfterToolCallInput | null {
+  if (isInternalHookEvent(event)) {
+    if (!AFTER_TOOL_CALL_ACTIONS.has(event.action)) {
+      return null;
+    }
+
+    const toolName = readToolName(event.context);
+    if (!toolName) {
+      return null;
+    }
+
+    return {
+      toolName,
+      params: readOptionalRecordFromContext(event.context, ["params", "arguments", "args", "input"]),
+      result: event.context.result,
+      error: event.context.error,
+      durationMs: readNumberFromContext(event.context, ["durationMs", "duration_ms"]),
+      requestId: readStringFromContext(event.context, ["toolCallId", "requestId", "runId", "id"]),
+      sessionId: event.sessionKey,
+      userId: readStringFromContext(event.context, ["userId"]),
+      agentId: readStringFromContext(event.context, ["agentId"]),
+      agentDid: readStringFromContext(event.context, ["agentDid"]),
+      metadata: {
+        hookType: event.type,
+        hookAction: event.action,
+        hookTimestamp: event.timestamp.toISOString(),
+      },
+    };
+  }
+
+  const toolName = readToolName(event);
+  if (!toolName) {
+    return null;
+  }
+
+  return {
+    toolName,
+    params: readOptionalRecordFromContext(event, ["params", "arguments", "args", "input"]),
+    result: event.result,
+    error: event.error,
+    durationMs: readNumberFromContext(event, ["durationMs", "duration_ms"]),
+    requestId: readStringFromContext(event, ["toolCallId", "requestId", "runId", "id"]),
+    sessionId: readStringFromContext(event, ["sessionId", "sessionKey"]),
+    userId: readStringFromContext(event, ["userId"]),
+    agentId: readStringFromContext(event, ["agentId"]),
+    agentDid: readStringFromContext(event, ["agentDid"]),
+    metadata: {
+      hookType: "after_tool_call",
+      hookAction: "after_tool_call",
+    },
+  };
+}
+
+export function applyBeforeToolCallResultToHookEvent(
+  event: OpenClawInternalHookEvent,
+  result: OpenClawBeforeToolCallResult,
+): void {
+  if (result.decision === "deny") {
+    event.context.block = true;
+    event.context.blockReason = result.reason ?? "Blocked by AGT policy.";
+    pushHookMessage(event, event.context.blockReason as string);
+    return;
+  }
+
+  if (result.decision === "review") {
+    const description = buildApprovalDescription(result);
+    event.context.requireApproval = {
+      title: `Approval required for tool "${readToolName(event.context) ?? "unknown"}"`,
+      description,
+      severity: "warning",
+      pluginId: OPENCLAW_HOOK_PLUGIN_ID,
+      approvers: result.approvers,
+    };
+    pushHookMessage(event, description);
+    return;
+  }
+
+  if (result.rewrittenParams) {
+    event.context.params = result.rewrittenParams;
+  }
+}
+
+export async function processOpenClawHookEvent(
+  event: OpenClawInternalHookEvent,
+  adapterOrConfig:
+    | OpenClawGovernanceAdapter
+    | OpenClawGovernanceAdapterConfig
+    | OpenClawHookConfig,
+): Promise<OpenClawHookProcessingResult | null> {
+  const adapter = resolveAdapter(adapterOrConfig);
+  const beforeInput = createOpenClawBeforeToolCallInputFromHookEvent(event);
+  if (beforeInput) {
+    const governanceResult = await adapter.evaluateBeforeToolCall(beforeInput);
+    applyBeforeToolCallResultToHookEvent(event, governanceResult);
+    return {
+      kind: "before_tool_call",
+      governanceResult,
+    };
+  }
+
+  const afterInput = createOpenClawAfterToolCallInputFromHookEvent(event);
+  if (afterInput && adapter.auditLogger) {
+    try {
+      return {
+        kind: "after_tool_call",
+        governanceResult: await adapter.recordAfterToolCall(afterInput),
+      };
+    } catch (error) {
+      pushHookMessage(
+        event,
+        formatError(
+          `AGT post-call audit logging failed for tool "${afterInput.toolName}"`,
+          error,
+        ),
+      );
+    }
+  }
+
+  return null;
+}
+
+export function mapBeforeToolCallResultToHookDecision(
+  result: OpenClawBeforeToolCallResult,
+): OpenClawBeforeToolCallHookDecision | undefined {
+  if (result.decision === "deny") {
+    return {
+      block: true,
+      blockReason: result.reason ?? "Blocked by AGT policy.",
+    };
+  }
+
+  if (result.decision === "review") {
+    return {
+      requireApproval: true,
+      blockReason: buildApprovalDescription(result),
+    };
+  }
+
+  if (result.rewrittenParams) {
+    return {
+      params: result.rewrittenParams,
+    };
+  }
+
+  return undefined;
+}
+
+export function registerOpenClawPluginHooks(
+  api: OpenClawPluginApi,
+  options?: {
+    cwd?: string;
+  },
+): OpenClawGovernanceAdapter {
+  const adapter = createOpenClawGovernanceAdapterFromPluginConfig(
+    api.pluginConfig,
+    options,
   );
 
-  if (resolvedConfig.audit.enabled !== false) {
-    api.registerHook("after_tool_call", async (event, ctx) => {
+  api.registerHook("before_tool_call", async (event) => {
+    const input = createOpenClawBeforeToolCallInputFromHookEvent(asRecord(event));
+    if (!input) {
+      return undefined;
+    }
+
+    const result = await adapter.evaluateBeforeToolCall(input);
+    return mapBeforeToolCallResultToHookDecision(result);
+  });
+
+  if (adapter.auditLogger) {
+    api.registerHook("after_tool_call", async (event) => {
+      const input = createOpenClawAfterToolCallInputFromHookEvent(asRecord(event));
+      if (!input) {
+        return undefined;
+      }
+
       try {
-        await adapter.recordAfterToolCall(
-          mapAfterToolCallEvent(
-            event as OpenClawNativeAfterToolCallEvent,
-            ctx as OpenClawNativeToolHookContext,
-          ),
-        );
+        await adapter.recordAfterToolCall(input);
       } catch (error) {
         api.logger?.error?.(
-          `AGT post-call audit logging failed for tool "${(event as OpenClawNativeAfterToolCallEvent).toolName}": ${formatError("audit error", error)}`,
+          formatError(
+            `AGT post-call audit logging failed for tool "${input.toolName}"`,
+            error,
+          ),
         );
       }
+
+      return undefined;
     });
   }
 
   api.logger?.info?.(
-    `Registered AGT OpenClaw governance hooks with ${resolvedConfig.policies.length} loaded policy set(s).`,
+    `Registered AGT OpenClaw plugin hooks with ${countPolicies(api.pluginConfig)} configured policy source(s).`,
   );
 
   return adapter;
+}
+
+export function createOpenClawHookEventHandler(
+  adapterOrConfig:
+    | OpenClawGovernanceAdapter
+    | OpenClawGovernanceAdapterConfig
+    | OpenClawHookConfig,
+): (event: OpenClawInternalHookEvent) => Promise<OpenClawHookProcessingResult | null> {
+  return async (event) => processOpenClawHookEvent(event, adapterOrConfig);
 }
 
 async function evaluateBeforeToolCallInternal(
@@ -286,88 +519,18 @@ function resolvePolicyEngine(
 }
 
 function resolveAdapter(
-  adapterOrConfig: OpenClawGovernanceAdapter | OpenClawGovernanceAdapterConfig,
+  adapterOrConfig:
+    | OpenClawGovernanceAdapter
+    | OpenClawGovernanceAdapterConfig
+    | OpenClawHookConfig,
 ): OpenClawGovernanceAdapter {
   if ("evaluateBeforeToolCall" in adapterOrConfig) {
     return adapterOrConfig;
   }
+  if ("policyFile" in adapterOrConfig || "policies" in adapterOrConfig) {
+    return createOpenClawGovernanceAdapterFromConfig(adapterOrConfig);
+  }
   return createOpenClawGovernanceAdapter(adapterOrConfig);
-}
-
-function mapBeforeToolCallEvent(
-  event: OpenClawNativeBeforeToolCallEvent,
-  ctx: OpenClawNativeToolHookContext,
-): OpenClawBeforeToolCallInput {
-  return {
-    toolName: event.toolName,
-    params: event.params,
-    requestId: event.toolCallId ?? ctx.toolCallId ?? ctx.runId,
-    sessionId: ctx.sessionId ?? ctx.sessionKey,
-    agentId: ctx.agentId,
-    metadata: {
-      runId: event.runId ?? ctx.runId,
-      toolCallId: event.toolCallId ?? ctx.toolCallId,
-    },
-    runtimeContext: {
-      sessionKey: ctx.sessionKey,
-    },
-  };
-}
-
-function mapAfterToolCallEvent(
-  event: OpenClawNativeAfterToolCallEvent,
-  ctx: OpenClawNativeToolHookContext,
-): OpenClawAfterToolCallInput {
-  return {
-    toolName: event.toolName,
-    params: event.params,
-    result: event.result,
-    error: event.error,
-    durationMs: event.durationMs,
-    requestId: event.toolCallId ?? ctx.toolCallId ?? ctx.runId,
-    sessionId: ctx.sessionId ?? ctx.sessionKey,
-    agentId: ctx.agentId,
-    metadata: {
-      runId: event.runId ?? ctx.runId,
-      toolCallId: event.toolCallId ?? ctx.toolCallId,
-    },
-  };
-}
-
-function mapBeforeToolCallResult(
-  result: OpenClawBeforeToolCallResult,
-  toolName: string,
-): OpenClawNativeBeforeToolCallResult {
-  if (result.decision === "deny") {
-    return {
-      block: true,
-      blockReason: result.reason ?? "Blocked by AGT policy.",
-    };
-  }
-
-  if (result.decision === "review") {
-    const details = [
-      result.reason ?? "Approval required by AGT policy.",
-      result.policyName ? `Policy: ${result.policyName}` : undefined,
-      result.matchedRule ? `Rule: ${result.matchedRule}` : undefined,
-      result.approvers.length > 0
-        ? `Suggested approvers: ${result.approvers.join(", ")}`
-        : undefined,
-    ].filter((value): value is string => Boolean(value));
-
-    return {
-      requireApproval: {
-        title: `Approval required for tool "${toolName}"`,
-        description: details.join("\n"),
-        severity: "warning",
-        pluginId: OPENCLAW_NATIVE_PLUGIN_ID,
-      },
-    };
-  }
-
-  return {
-    params: result.rewrittenParams,
-  };
 }
 
 function resolveAgentId(
@@ -474,8 +637,8 @@ function formatError(prefix: string, error: unknown): string {
   return `${prefix}: ${String(error)}`;
 }
 
-function resolveNativePluginConfig(
-  config: OpenClawNativePluginConfig,
+function resolveHookConfig(
+  config: OpenClawHookConfig,
   cwd = process.cwd(),
 ): {
   agentId?: string;
@@ -496,7 +659,7 @@ function resolveNativePluginConfig(
 
   if (policies.length === 0) {
     throw new OpenClawGovernanceConfigError(
-      'Native OpenClaw plugin configuration requires "policyFile" and/or non-empty "policies".',
+      'OpenClaw hook configuration requires "policyFile" and/or non-empty "policies".',
     );
   }
 
@@ -516,31 +679,6 @@ function resolveNativePluginConfig(
       logger: auditLogger,
       config: config.audit?.stdout ? undefined : resolveAuditConfig(config.audit?.maxEntries),
     },
-  };
-}
-
-function normalizeNativePluginConfig(
-  pluginConfig: Record<string, unknown> | undefined,
-): OpenClawNativePluginConfig {
-  if (!pluginConfig) {
-    return {};
-  }
-
-  const auditConfig = readOptionalRecord(pluginConfig.audit, "audit");
-
-  return {
-    policyFile: readOptionalString(pluginConfig.policyFile, "policyFile"),
-    policies: readOptionalPolicies(pluginConfig.policies),
-    agentId: readOptionalString(pluginConfig.agentId, "agentId"),
-    agentDid: readOptionalString(pluginConfig.agentDid, "agentDid"),
-    failClosed: readOptionalBoolean(pluginConfig.failClosed, "failClosed"),
-    audit: auditConfig
-      ? {
-          enabled: readOptionalBoolean(auditConfig.enabled, "audit.enabled"),
-          stdout: readOptionalBoolean(auditConfig.stdout, "audit.stdout"),
-          maxEntries: readOptionalNumber(auditConfig.maxEntries, "audit.maxEntries"),
-        }
-      : undefined,
   };
 }
 
@@ -573,6 +711,135 @@ function createStdoutAuditLogger(maxEntries?: number) {
 
 function resolveAuditConfig(maxEntries?: number): AuditConfig | undefined {
   return typeof maxEntries === "number" ? { maxEntries } : undefined;
+}
+
+function isInternalHookEvent(
+  value: OpenClawInternalHookEvent | Record<string, unknown>,
+): value is OpenClawInternalHookEvent {
+  return (
+    "type" in value &&
+    "action" in value &&
+    "sessionKey" in value &&
+    "context" in value &&
+    "messages" in value
+  );
+}
+
+function readToolName(context: Record<string, unknown>): string | undefined {
+  const direct = readStringFromContext(context, ["toolName", "tool_name", "name"]);
+  if (direct) {
+    return direct;
+  }
+
+  const nestedTool = readOptionalRecordFromContext(context, ["tool"]);
+  if (!nestedTool) {
+    return undefined;
+  }
+
+  return readStringFromContext(nestedTool, ["name"]);
+}
+
+function readParams(context: Record<string, unknown>): Record<string, unknown> {
+  return readOptionalRecordFromContext(context, ["params", "arguments", "args", "input"]) ?? {};
+}
+
+function readOptionalRecordFromContext(
+  context: Record<string, unknown>,
+  fieldNames: string[],
+): Record<string, unknown> | undefined {
+  for (const fieldName of fieldNames) {
+    const value = context[fieldName];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+  }
+  return undefined;
+}
+
+function readStringFromContext(
+  context: Record<string, unknown>,
+  fieldNames: string[],
+): string | undefined {
+  for (const fieldName of fieldNames) {
+    const value = context[fieldName];
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function readNumberFromContext(
+  context: Record<string, unknown>,
+  fieldNames: string[],
+): number | undefined {
+  for (const fieldName of fieldNames) {
+    const value = context[fieldName];
+    if (typeof value === "number") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function buildApprovalDescription(result: OpenClawBeforeToolCallResult): string {
+  return [
+    result.reason ?? "Approval required by AGT policy.",
+    result.policyName ? `Policy: ${result.policyName}` : undefined,
+    result.matchedRule ? `Rule: ${result.matchedRule}` : undefined,
+    result.approvers.length > 0
+      ? `Suggested approvers: ${result.approvers.join(", ")}`
+      : undefined,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join("\n");
+}
+
+function pushHookMessage(event: OpenClawInternalHookEvent, message: string): void {
+  if (!event.messages.includes(message)) {
+    event.messages.push(message);
+  }
+}
+
+function normalizeNativePluginConfig(
+  pluginConfig: Record<string, unknown> | undefined,
+): OpenClawHookConfig {
+  if (!pluginConfig) {
+    return {};
+  }
+
+  const auditConfig = readOptionalRecord(pluginConfig.audit, "audit");
+
+  return {
+    policyFile: readOptionalString(pluginConfig.policyFile, "policyFile"),
+    policies: readOptionalPolicies(pluginConfig.policies),
+    agentId: readOptionalString(pluginConfig.agentId, "agentId"),
+    agentDid: readOptionalString(pluginConfig.agentDid, "agentDid"),
+    failClosed: readOptionalBoolean(pluginConfig.failClosed, "failClosed"),
+    audit: auditConfig
+      ? {
+          enabled: readOptionalBoolean(auditConfig.enabled, "audit.enabled"),
+          stdout: readOptionalBoolean(auditConfig.stdout, "audit.stdout"),
+          maxEntries: readOptionalNumber(auditConfig.maxEntries, "audit.maxEntries"),
+        }
+      : undefined,
+  };
+}
+
+function countPolicies(pluginConfig: Record<string, unknown> | undefined): number {
+  if (!pluginConfig) {
+    return 0;
+  }
+
+  const policies = pluginConfig.policies;
+  return Array.isArray(policies) ? policies.length : 0;
 }
 
 function readOptionalRecord(

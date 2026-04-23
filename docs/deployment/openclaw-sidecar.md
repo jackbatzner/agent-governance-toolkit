@@ -11,7 +11,7 @@ This page documents the **HTTP sidecar** deployment pattern for OpenClaw. Use it
 
 > **Container images:** AGT publishes container images to `ghcr.io/microsoft/agentmesh/`. This page still assumes you build or mirror the specific sidecar image you plan to run in your own registry. See [Container Images](../../packages/agent-mesh/docs/deployment/azure.md#container-images) for the broader image catalog.
 
-> **See also:** [OpenClaw adapter guide](../integrations/openclaw-adapter.md) | [OpenClaw AKS protection guidance](openclaw-aks-protection.md) | [AKS deployment](../../packages/agent-mesh/docs/deployment/azure.md) | [OpenShell integration](../integrations/openshell.md) | [OpenClaw adapter README](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md)
+> **See also:** [OpenClaw advanced integration and operations guide](../integrations/openclaw-adapter.md) | [OpenClaw AKS protection appendix](openclaw-aks-protection.md) | [AKS deployment](../../packages/agent-mesh/docs/deployment/azure.md) | [OpenShell integration](../integrations/openshell.md) | [OpenClaw adapter README](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md)
 
 ---
 
@@ -23,7 +23,7 @@ This page documents the **HTTP sidecar** deployment pattern for OpenClaw. Use it
 | **Adapter + sidecar** | In-process governance plus a local governance HTTP service | Explicit wiring between OpenClaw and the sidecar, ingress design |
 | **Adapter + shared governance service** | In-process governance with centrally managed policy or audit backends | Network path, service auth, approval systems |
 
-This page focuses on the **sidecar** column. For the in-process wiring flow, use the [OpenClaw adapter guide](../integrations/openclaw-adapter.md). For production AKS boundaries, use the [AKS protection guide](openclaw-aks-protection.md).
+This page focuses on the **sidecar** column. For the in-process wiring flow, use the [OpenClaw advanced integration and operations guide](../integrations/openclaw-adapter.md). For production AKS boundaries, use the [AKS protection appendix](openclaw-aks-protection.md).
 
 ---
 
@@ -72,14 +72,14 @@ OpenClaw is a powerful autonomous agent capable of executing code, calling APIs,
 │  │  Tool calls ─────────────────► Policy check              │ │
 │  │              ◄─────────────── Allow / Deny               │ │
 │  │                          │  │                            │ │
-│  │  localhost:8080          │  │  localhost:8081 (proxy)     │ │
-│  │                          │  │  localhost:9091 (metrics)   │ │
+│  │  localhost:8080          │  │  localhost:8081 (API +      │ │
+│  │                          │  │  metrics on /api/v1/metrics)│ │
 │  └─────────────────────────┘  └────────────────────────────┘ │
 │                                                               │
 └──────────────────────────────────────────────────────────────┘
          │                              │
-         ▼                              ▼
-   External APIs               Azure Monitor / Prometheus
+          ▼                              ▼
+   External APIs         Azure Monitor / Prometheus scrape 8081
 ```
 
 ---
@@ -119,7 +119,7 @@ open http://localhost:8081/docs
 > **Note:** The demo runs the governance sidecar only. To integrate with
 > your OpenClaw instance, configure your agent's tool-call pipeline to call
 > the sidecar API (`http://localhost:8081/api/v1/execute`) before executing
-> actions. OpenClaw does **not** natively read a `GOVERNANCE_API` env var —
+> actions. OpenClaw does **not** natively read a `GOVERNANCE_PROXY` env var —
 > the integration must be explicit in your orchestration layer. If you want
 > governance to run in-process inside OpenClaw's existing interception path,
 > follow the adapter setup guide in
@@ -138,7 +138,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - GOVERNANCE_API=http://governance-sidecar:8081  # Your code must read this
+      - GOVERNANCE_PROXY=http://governance-sidecar:8081  # Your wrapper code must read this
     depends_on:
       governance-sidecar:
         condition: service_healthy
@@ -173,7 +173,7 @@ networks:
 
 ## Production Deployment on AKS
 
-> **Note:** The governance sidecar does **not** require PostgreSQL, Redis, or Event Grid. Those are optional components for the full enterprise AgentMesh cluster deployment. The sidecar is self-contained — policies load from a ConfigMap, audit logs go to stdout.
+> **Note:** The governance sidecar does **not** require PostgreSQL, Redis, or Event Grid. Those are optional components for the full enterprise AgentMesh cluster deployment. The sidecar is self-contained, and audit logs go to stdout. File-backed policy loading from a mounted directory is **not** implemented in the sidecar today; policy documents must be sent in the request payload or resolved by your own wrapper logic.
 
 ### 1. Build the Governance Sidecar Image
 
@@ -187,20 +187,17 @@ docker build -t <YOUR_REGISTRY>/agentmesh/governance-sidecar:0.3.0 \
 docker push <YOUR_REGISTRY>/agentmesh/governance-sidecar:0.3.0
 ```
 
-### 2. Create the Policy ConfigMap
+### 2. Prepare policy input for your wrapper
 
 ```bash
 kubectl create namespace openclaw-governed
-
-# Load your governance policies
-kubectl create configmap openclaw-policies \
-  --from-file=policies/ \
-  -n openclaw-governed
 ```
+
+If you want to keep policy documents in Kubernetes, store them in a ConfigMap or Secret that **your own wrapper code** reads before it calls `http://localhost:8081/api/v1/execute`. The sidecar API itself expects policy data in the request body.
 
 ### 3. Deploy OpenClaw + Governance Sidecar
 
-Use a standard Kubernetes Deployment with two containers in one pod — the agent and its governance sidecar:
+Use a standard Kubernetes Deployment with two containers in one pod — the agent and its governance sidecar. In this example, `GOVERNANCE_PROXY` is just a placeholder environment variable that **your own OpenClaw wrapper code** reads; OpenClaw does not natively consume it today.
 
 **`openclaw-governed.yaml`:**
 
@@ -236,17 +233,9 @@ spec:
           ports:
             - containerPort: 8081
               name: proxy
-            - containerPort: 9091
-              name: metrics
           env:
-            - name: POLICY_DIR
-              value: /policies
             - name: LOG_LEVEL
               value: INFO
-          volumeMounts:
-            - name: policies
-              mountPath: /policies
-              readOnly: true
           resources:
             requests:
               cpu: 250m
@@ -254,11 +243,6 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-
-      volumes:
-        - name: policies
-          configMap:
-            name: openclaw-policies
 ---
 apiVersion: v1
 kind: Service
@@ -272,9 +256,9 @@ spec:
     - name: agent
       port: 8080
       targetPort: 8080
-    - name: metrics
-      port: 9091
-      targetPort: 9091
+    - name: governance-api
+      port: 8081
+      targetPort: 8081
 ```
 
 ### 4. Deploy and Verify
@@ -297,7 +281,7 @@ kubectl exec -n openclaw-governed deploy/openclaw-governed -c openclaw -- \
 
 The [AgentMesh Helm chart](../../packages/agent-mesh/charts/agentmesh/) deploys the **full 4-component enterprise architecture** (API Gateway, Trust Engine, Policy Server, Audit Collector). That is a different deployment model — use it when you need a centralized governance control plane serving multiple agents.
 
-For the **OpenClaw sidecar** pattern (one governance instance per agent pod), use the plain Kubernetes manifests above. This is simpler, requires no external dependencies (no PostgreSQL, no Redis), and works immediately.
+For the **OpenClaw sidecar** pattern (one governance instance per agent pod), use the plain Kubernetes manifests above as the **pod topology**. This is simpler and requires no external dependencies (no PostgreSQL, no Redis), but it only becomes an active governance integration after your OpenClaw wrapper or orchestration layer actually calls the sidecar API before tool execution.
 
 ### What Secrets Do I Need?
 
@@ -308,7 +292,7 @@ For the **OpenClaw sidecar** pattern (one governance instance per agent pod), us
 | **Redis credentials** | Shared session/cache state | No (sidecar is self-contained) |
 | **PostgreSQL credentials** | Persistent audit storage | No (sidecar logs to stdout) |
 
-For a basic policy-enforcement sidecar, **no secrets are required** — just the policy ConfigMap.
+For a basic policy-enforcement sidecar, **no secrets are required** unless your wrapper needs them for downstream integrations. If you store policy documents in Kubernetes, mount them into the OpenClaw wrapper container or inject them into your orchestration layer; the sidecar itself does not natively load policy files from a mounted directory today.
 
 ---
 
@@ -450,8 +434,8 @@ kubectl logs <pod> -c governance-sidecar -n openclaw-governed
 # Verify the proxy endpoint
 kubectl exec <pod> -c openclaw -- curl http://localhost:8081/health
 
-# Check policy files are mounted
-kubectl exec <pod> -c governance-sidecar -- ls /policies/
+# If your wrapper reads policies from a ConfigMap, verify that ConfigMap exists
+kubectl describe configmap <your-policy-configmap> -n openclaw-governed
 ```
 
 ### OpenClaw actions being incorrectly blocked

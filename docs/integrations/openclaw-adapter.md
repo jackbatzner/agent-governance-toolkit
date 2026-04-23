@@ -1,8 +1,61 @@
-# OpenClaw Adapter Integration Guide
+# OpenClaw Advanced Integration and Operations Guide
+
+> **Use this guide after Tutorial 34** when you want to understand the hook model, extend the baseline integration, or add sidecar-backed patterns.
 
 Use [`@microsoft/agentmesh-openclaw`](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md) when you want AGT to run **inside** OpenClaw's existing tool interception path.
 
 This is the TypeScript adapter path for OpenClaw operators and platform teams. It is different from the [OpenClaw sidecar pattern](../deployment/openclaw-sidecar.md), which exposes governance over HTTP.
+
+## Prerequisites
+
+Before using this guide, you should have:
+
+- completed or at least skimmed [Tutorial 34](../tutorials/34-openclaw-end-to-end.md)
+- a working OpenClaw deployment or checkout
+- a decision on which existing OpenClaw hook path you are wiring into
+- a policy bundle strategy for local files, mounted config, or a custom policy backend
+
+## What you'll learn
+
+| Section | What you'll learn |
+|---|---|
+| [What ships vs. what you own](#what-ships-vs-what-you-own) | Which parts the package gives you and which parts still belong to your OpenClaw deployment |
+| [Preferred integration model](#preferred-integration-model-hook-integration-first) | Why explicit hook integration is the default path |
+| [Deployment choices](#deployment-choices) | When to choose in-process only, sidecar, or shared service |
+| [Practical integration model](#practical-integration-model) | How to load policy, fail closed, keep approvals explicit, scan MCP tools, and export audits |
+| [Extension path](#extension-path-after-the-baseline-tutorial) | What to add after the baseline tutorial is working |
+
+## Contoso baseline
+
+The baseline assumption for this page is the same Contoso scenario used in Tutorial 34:
+
+- OpenClaw powers a customer support assistant
+- AGT governs tool calls before execution
+- AKS hosts the final deployment
+
+Start with the tutorial if you want the full end-to-end walkthrough. Use this page when you want to understand or extend the integration model behind that walkthrough.
+
+## Use this page for
+
+Use this page when one of these is true:
+
+1. the baseline tutorial already works and you want to extend it
+2. you need to understand the adapter contract without reading the whole end-to-end walkthrough
+3. you are deciding between in-process only, sidecar, or shared-service architectures
+
+If you still need to provision ACR, AKS, manifests, or run the Contoso validation prompts, go back to [Tutorial 34](../tutorials/34-openclaw-end-to-end.md).
+
+## Choose your follow-on path
+
+Use the sections in this guide based on your audience or goal:
+
+| Audience | Start here |
+|---|---|
+| **OpenClaw maintainer** | [Preferred integration model](#preferred-integration-model-hook-integration-first) and [Practical integration model](#practical-integration-model) |
+| **AKS creator / platform engineer** | [Deployment choices](#deployment-choices), [AKS operators](#aks-operators), and the [AKS protection appendix](../deployment/openclaw-aks-protection.md) |
+| **AGT creator / security owner** | [What ships vs. what you own](#what-ships-vs-what-you-own), [Fail closed before a tool runs](#2-fail-closed-before-a-tool-runs), and [Export audits somewhere durable](#5-export-audits-somewhere-durable) |
+| **OpenClaw operator new to AGT** | Re-read [Tutorial 34](../tutorials/34-openclaw-end-to-end.md), then come back to [Practical integration model](#practical-integration-model) |
+| **Leadership / architecture reviewer** | [What ships vs. what you own](#what-ships-vs-what-you-own) and [Deployment choices](#deployment-choices) |
 
 ## What ships vs. what you own
 
@@ -14,7 +67,7 @@ This is the TypeScript adapter path for OpenClaw operators and platform teams. I
 | Approval signal | `review` decision + `approvers` list | Approval UX, queueing, reviewer identity, and resume behavior |
 | Runtime isolation | Not part of the adapter | OpenClaw sandboxing, container policy, network policy, secrets handling |
 
-## Preferred integration model: native OpenClaw plugin first
+## Preferred integration model: native plugin first
 
 For most developers, the best path is:
 
@@ -28,7 +81,7 @@ The adapter is still designed around OpenClaw's existing interception path, but 
 ```text
 OpenClaw runtime
     |
-    +--> native plugin entry loads config
+    +--> plugin entry loads config
     +--> before_tool_call
             |
             v
@@ -62,12 +115,12 @@ If you are self-hosting or maintaining OpenClaw itself, the known underlying int
 See the package README for the concrete snippets and fallback source-level examples:
 
 - [Install and load policy bundles](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#1-define-a-policy-bundle)
-- [Enable the native plugin](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#2-enable-the-native-openclaw-plugin)
-- [Register hooks manually](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#3-advanced-register-hooks-manually)
-- [Enable MCP scanning](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#6-enable-mcp-tool-definition-scanning-before-registration)
-- [Record post-call audits](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#7-record-post-call-audit-events)
+- [Wire the OpenClaw hook](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#2-wire-the-openclaw-hook)
+- [Wire review handling](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#3-wire-review-and-approval-handling)
+- [Enable MCP scanning](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#4-enable-mcp-tool-definition-scanning-before-registration)
+- [Record post-call audits](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#5-record-post-call-audit-events)
 
-If you want one follow-along guide that starts with installation and ends with AKS validation, use the [OpenClaw end-to-end tutorial](../tutorials/34-openclaw-end-to-end.md).
+If you want one follow-along guide that starts with installation and ends with AKS validation, use the [OpenClaw end-to-end tutorial](../tutorials/34-openclaw-end-to-end.md). This page is intentionally narrower and more architectural.
 
 ## Deployment choices
 
@@ -105,9 +158,9 @@ If you already have a central policy service, implement `policyEngine.evaluatePo
 
 That makes AGT a **protective control before tool execution**, not just a logging layer after the fact.
 
-### Native plugin registration shape
+### Hook helper fallback
 
-The default package path now ships the OpenClaw plugin entry, manifest, and `openclaw.runtimeExtensions` metadata needed for native loading. Manual registration is still available for advanced wrappers, but it is no longer the primary setup story.
+The default package path is now the native plugin entry. The lower-level hook helpers remain available when you need to wire the adapter into a custom or source-level interception path.
 
 ### 3. Keep approvals explicit
 
@@ -139,6 +192,40 @@ The default SDK audit logger keeps a hash-chained audit log in memory. For custo
 
 The package README shows one pattern: wrap the SDK `AuditLogger` and also write structured JSON to stdout.
 
+## Extension path after the baseline tutorial
+
+Once the Contoso baseline walkthrough is working, the usual next extensions are:
+
+### 1. Add extra governance surfaces
+
+The baseline integration already covers the most important path:
+
+- `before_tool_call` for allow / deny / review
+- `after_tool_call` for outcome audit logging
+- MCP definition scanning before registration
+
+That means you usually do **not** need a second governance mechanism immediately. Start by making those three surfaces trustworthy.
+
+### 2. Add a sidecar when you want a local governance service boundary
+
+Choose a sidecar when you want:
+
+- a pod-local HTTP endpoint for adjacent governance checks
+- cleaner separation between OpenClaw runtime code and a governance service
+- an easier path to reusing the same local governance service for multiple runtimes in the same pod or namespace
+
+The adapter remains the pre-execution gate. The sidecar is an **additional architecture layer**, not a replacement for `before_tool_call`.
+
+### 3. Add a shared governance service when you want central operations
+
+Choose a shared service when you want:
+
+- centrally managed policy backends
+- centralized audit export or review workflows
+- governance consistency across many OpenClaw deployments
+
+Do this only after the in-process path is already clear, because a shared service adds network and tenancy complexity.
+
 ## How the adapter relates to the sidecar
 
 The [sidecar pattern](../deployment/openclaw-sidecar.md) is useful when you want a network-accessible governance surface next to OpenClaw. The adapter is useful when you want policy enforcement directly in the OpenClaw process.
@@ -152,10 +239,19 @@ Using both is an architecture choice, not an automatic behavior in the adapter p
 
 ## AKS operators
 
-For production guidance on ConfigMaps vs. Secrets, mounted policy bundles, network boundaries, workload identity, audit export, and runtime hardening, use the [OpenClaw AKS protection guide](../deployment/openclaw-aks-protection.md).
+For production guidance on ConfigMaps vs. Secrets, mounted policy bundles, network boundaries, workload identity, audit export, and runtime hardening, use the [OpenClaw AKS protection appendix](../deployment/openclaw-aks-protection.md).
+
+## Reference links
+
+- [Tutorial 34](../tutorials/34-openclaw-end-to-end.md)
+- [OpenClaw package README](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md)
+- [Package API](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#api)
+- [Error behavior](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#error-behavior)
+- [Public types](../../packages/agentmesh-integrations/openclaw-agentmesh/src/types.ts)
+- [Hook wiring examples](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md#2-wire-the-openclaw-hook)
 
 ## Related
 
 - [Package README](../../packages/agentmesh-integrations/openclaw-agentmesh/README.md)
-- [OpenClaw AKS protection guidance](../deployment/openclaw-aks-protection.md)
+- [OpenClaw AKS protection appendix](../deployment/openclaw-aks-protection.md)
 - [OpenClaw sidecar pattern](../deployment/openclaw-sidecar.md)

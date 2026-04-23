@@ -25,82 +25,6 @@ export interface OpenClawPolicyEngine {
   loadPolicy?(policy: Policy): void;
 }
 
-export interface OpenClawNativePluginLogger {
-  info?(message: string, ...args: unknown[]): void;
-  warn?(message: string, ...args: unknown[]): void;
-  error?(message: string, ...args: unknown[]): void;
-}
-
-export interface OpenClawNativePluginHookOptions {
-  priority?: number;
-}
-
-export interface OpenClawNativeBeforeToolCallEvent {
-  toolName: string;
-  params: Record<string, unknown>;
-  runId?: string;
-  toolCallId?: string;
-}
-
-export interface OpenClawNativeAfterToolCallEvent {
-  toolName: string;
-  params: Record<string, unknown>;
-  runId?: string;
-  toolCallId?: string;
-  result?: unknown;
-  error?: string;
-  durationMs?: number;
-}
-
-export interface OpenClawNativeToolHookContext {
-  agentId?: string;
-  sessionKey?: string;
-  sessionId?: string;
-  runId?: string;
-  toolName: string;
-  toolCallId?: string;
-}
-
-export interface OpenClawNativeApprovalRequest {
-  title: string;
-  description: string;
-  severity?: "info" | "warning" | "critical";
-  timeoutMs?: number;
-  timeoutBehavior?: "allow" | "deny";
-  pluginId?: string;
-  onResolution?: (decision: string) => Promise<void> | void;
-}
-
-export interface OpenClawNativeBeforeToolCallResult {
-  params?: Record<string, unknown>;
-  block?: boolean;
-  blockReason?: string;
-  requireApproval?: OpenClawNativeApprovalRequest;
-}
-
-export interface OpenClawNativePluginApi {
-  pluginConfig?: Record<string, unknown>;
-  logger?: OpenClawNativePluginLogger;
-  registerHook: (
-    events: string | string[],
-    handler: (event: unknown, ctx: unknown) => Promise<unknown> | unknown,
-    opts?: OpenClawNativePluginHookOptions,
-  ) => void;
-}
-
-export interface OpenClawNativePluginConfig {
-  policyFile?: string;
-  policies?: Policy[];
-  agentId?: string;
-  agentDid?: string;
-  failClosed?: boolean;
-  audit?: {
-    enabled?: boolean;
-    stdout?: boolean;
-    maxEntries?: number;
-  };
-}
-
 export interface OpenClawAuditLogger {
   log(entry: Omit<AuditEntry, "timestamp" | "hash" | "previousHash">): AuditEntry;
 }
@@ -193,4 +117,68 @@ export interface OpenClawGovernanceAdapter {
   recordAfterToolCall(input: OpenClawAfterToolCallInput): Promise<OpenClawAfterToolCallResult>;
   scanMcpToolDefinition(toolDefinition: McpToolDefinition): OpenClawMcpScanResult;
   scanMcpToolDefinitions(toolDefinitions: McpToolDefinition[]): OpenClawMcpScanResult[];
+}
+
+export type InternalHookEventType = string;
+
+export interface OpenClawInternalHookEvent {
+  type: InternalHookEventType;
+  action: string;
+  sessionKey: string;
+  context: Record<string, unknown>;
+  timestamp: Date;
+  messages: string[];
+}
+
+export interface OpenClawHookConfig {
+  policyFile?: string;
+  policies?: Policy[];
+  agentId?: string;
+  agentDid?: string;
+  failClosed?: boolean;
+  audit?: {
+    enabled?: boolean;
+    stdout?: boolean;
+    maxEntries?: number;
+  };
+}
+
+export type OpenClawNativePluginConfig = OpenClawHookConfig;
+
+export interface OpenClawHookProcessingResult {
+  kind: "before_tool_call" | "after_tool_call";
+  governanceResult: OpenClawBeforeToolCallResult | OpenClawAfterToolCallResult;
+}
+
+export interface OpenClawPluginLogger {
+  debug?(message: string, ...args: unknown[]): void;
+  info?(message: string, ...args: unknown[]): void;
+  warn?(message: string, ...args: unknown[]): void;
+  error?(message: string, ...args: unknown[]): void;
+}
+
+export interface OpenClawPluginApi {
+  id: string;
+  name: string;
+  pluginConfig?: Record<string, unknown>;
+  logger?: OpenClawPluginLogger;
+  registerHook(
+    hook: string | string[],
+    handler: (event: unknown) => Promise<unknown> | unknown,
+  ): void;
+}
+
+export interface OpenClawPluginEntry {
+  id: string;
+  name: string;
+  description: string;
+  configSchema?: Record<string, unknown> | (() => Record<string, unknown>);
+  register(api: OpenClawPluginApi): void;
+}
+
+export interface OpenClawBeforeToolCallHookDecision {
+  block?: boolean;
+  blockReason?: string;
+  requireApproval?: boolean;
+  params?: Record<string, unknown>;
 }
