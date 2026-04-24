@@ -248,6 +248,50 @@ What you should see:
 
 Create a policy file in your OpenClaw checkout.
 
+### CLI follow-along
+
+Run these commands from the root of your OpenClaw checkout:
+
+```bash
+mkdir -p config
+cat > config/openclaw-governance.policies.json <<'EOF'
+[
+  {
+    "name": "openclaw-tool-policy",
+    "agents": ["*"],
+    "default_action": "deny",
+    "rules": [
+      {
+        "name": "allow-read-file",
+        "condition": "tool.name == 'read_file'",
+        "ruleAction": "allow",
+        "description": "Allow simple file reads."
+      },
+      {
+        "name": "review-shell",
+        "condition": "tool.name == 'shell'",
+        "ruleAction": "require_approval",
+        "approvers": ["ops@contoso.com"],
+        "description": "Shell access requires human review."
+      },
+      {
+        "name": "deny-secret-path-write",
+        "condition": "tool.name == 'write_file' and params.path.startswith('/secrets/')",
+        "ruleAction": "deny",
+        "description": "Never write into mounted secret locations."
+      }
+    ]
+  }
+]
+EOF
+```
+
+If you want a quick parse check:
+
+```bash
+cat config/openclaw-governance.policies.json | jq .
+```
+
 **`config/openclaw-governance.policies.json`**
 
 ```json
@@ -305,6 +349,28 @@ What you should see:
 
 The package now ships a real OpenClaw plugin entry and manifest. Point the plugin at the policy bundle in your OpenClaw config:
 
+### CLI follow-along
+
+Install the plugin first:
+
+```bash
+openclaw plugins install @microsoft/agentmesh-openclaw
+```
+
+Or, if you are testing from a local AGT source checkout, run this from the `packages/agentmesh-integrations/openclaw-agentmesh/` directory:
+
+```bash
+openclaw plugins install .
+```
+
+Then find the active OpenClaw config file:
+
+```bash
+openclaw gateway status --deep --require-rpc
+```
+
+Update the active config file so it includes this block under `plugins.entries`:
+
 ```json
 {
   "plugins": {
@@ -324,6 +390,36 @@ The package now ships a real OpenClaw plugin entry and manifest. Point the plugi
     }
   }
 }
+```
+
+For the first local test, prefer an **absolute** `policyFile` path instead of a relative path so you can rule out working-directory issues:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "agentmesh-openclaw": {
+        "enabled": true,
+        "config": {
+          "policyFile": "/absolute/path/to/openclaw/config/openclaw-governance.policies.json",
+          "agentId": "openclaw-main-agent",
+          "agentDid": "did:agentmesh:openclaw-main-agent",
+          "audit": {
+            "enabled": true,
+            "stdout": true,
+            "maxEntries": 5000
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+After you save the config, restart OpenClaw:
+
+```bash
+openclaw gateway restart
 ```
 
 The native plugin entry then:
@@ -383,6 +479,12 @@ After wiring the files in your OpenClaw repo:
 1. run the package manager install step your OpenClaw checkout already uses
 2. run the existing OpenClaw build command
 3. run the existing OpenClaw test command or smoke test flow
+
+For the AGT plugin itself, the shortest first-pass local check is:
+
+1. trigger a `read_file` call and confirm it is **allowed**
+2. trigger a `shell` call and confirm it is routed to **review**
+3. trigger a `write_file` call that targets `/secrets/...` and confirm it is **denied**
 
 This guide intentionally does **not** invent a fake OpenClaw build command because that depends on the checkout you are testing against.
 
