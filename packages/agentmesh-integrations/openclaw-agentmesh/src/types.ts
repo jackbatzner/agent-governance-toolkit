@@ -4,14 +4,12 @@ import type {
   AuditConfig,
   AuditEntry,
   ConflictResolutionStrategy,
-  Policy,
-  PolicyDecisionResult,
-} from "@microsoft/agentmesh-sdk/types";
-import type {
   McpScanResult,
   McpThreat,
   McpToolDefinition,
-} from "@microsoft/agentmesh-sdk/mcp";
+  Policy,
+  PolicyDecisionResult,
+} from "@microsoft/agentmesh-sdk";
 
 export interface OpenClawAgentIdentity {
   did?: string;

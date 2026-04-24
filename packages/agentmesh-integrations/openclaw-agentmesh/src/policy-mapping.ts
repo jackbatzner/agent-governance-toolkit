@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import type { PolicyDecisionResult } from "@microsoft/agentmesh-sdk/types";
+import type { PolicyDecisionResult } from "@microsoft/agentmesh-sdk";
 import type { OpenClawGovernanceDecision } from "./types";
 
 export function mapPolicyDecisionToOpenClawDecision(

@@ -155,7 +155,7 @@ The adapter accepts `Policy[]` objects directly. A simple customer-facing patter
 
 ```ts
 import { readFileSync } from "node:fs";
-import type { Policy } from "@microsoft/agentmesh-sdk/types";
+import type { Policy } from "@microsoft/agentmesh-sdk";
 
 export function loadPolicies(): Policy[] {
   const raw = readFileSync(

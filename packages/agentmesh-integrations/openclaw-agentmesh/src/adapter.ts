@@ -2,10 +2,15 @@
 // Licensed under the MIT License.
 import { readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
-import { AuditLogger } from "@microsoft/agentmesh-sdk/audit";
-import { McpSecurityScanner, type McpToolDefinition } from "@microsoft/agentmesh-sdk/mcp";
-import { PolicyEngine } from "@microsoft/agentmesh-sdk/policy";
-import type { AuditConfig, Policy, PolicyDecisionResult } from "@microsoft/agentmesh-sdk/types";
+import {
+  AuditLogger,
+  McpSecurityScanner,
+  PolicyEngine,
+  type AuditConfig,
+  type McpToolDefinition,
+  type Policy,
+  type PolicyDecisionResult,
+} from "@microsoft/agentmesh-sdk";
 import { recordAuditEntry } from "./audit";
 import {
   OpenClawGovernanceAuditError,

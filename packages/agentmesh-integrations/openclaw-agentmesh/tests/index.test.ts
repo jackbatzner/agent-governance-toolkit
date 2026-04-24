@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 import { describe, expect, it } from "vitest";
-import { McpThreatType } from "@microsoft/agentmesh-sdk/mcp";
+import { McpThreatType } from "@microsoft/agentmesh-sdk";
 import {
   createOpenClawGovernanceAdapter,
   mapPolicyDecisionToOpenClawDecision,

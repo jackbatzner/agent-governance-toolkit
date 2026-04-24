@@ -11,10 +11,6 @@ export default defineConfig({
   splitting: false,
   external: [
     "@microsoft/agentmesh-sdk",
-    "@microsoft/agentmesh-sdk/audit",
-    "@microsoft/agentmesh-sdk/mcp",
-    "@microsoft/agentmesh-sdk/policy",
-    "@microsoft/agentmesh-sdk/types",
     "openclaw/plugin-sdk/plugin-entry",
   ],
 });

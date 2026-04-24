@@ -3,7 +3,7 @@
 import {
   McpSecurityScanner,
   type McpToolDefinition,
-} from "@microsoft/agentmesh-sdk/mcp";
+} from "@microsoft/agentmesh-sdk";
 import type { OpenClawGovernanceDecision, OpenClawMcpScanResult, OpenClawMcpScanner } from "./types";
 
 const DENY_SCAN_THRESHOLD = 80;

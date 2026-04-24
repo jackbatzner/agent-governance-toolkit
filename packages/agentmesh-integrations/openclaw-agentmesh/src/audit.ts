@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-import type { AuditEntry } from "@microsoft/agentmesh-sdk/types";
+import type { AuditEntry } from "@microsoft/agentmesh-sdk";
 import type { OpenClawAuditLogger, OpenClawGovernanceDecision } from "./types";
 
 type AuditStage = "before_tool_call" | "after_tool_call";
