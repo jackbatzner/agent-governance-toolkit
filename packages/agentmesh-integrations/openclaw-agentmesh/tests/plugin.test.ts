@@ -120,7 +120,6 @@ describe("native OpenClaw plugin entry", () => {
     }> = [];
     const logger = {
       info: vi.fn(),
-      warn: vi.fn(),
       error: vi.fn(),
     };
 
@@ -136,10 +135,9 @@ describe("native OpenClaw plugin entry", () => {
     pluginEntry.register(api);
 
     expect(registrations).toHaveLength(0);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining("installed but not configured yet"),
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining("installed but inactive until you add configuration"),
     );
-    expect(logger.info).not.toHaveBeenCalled();
     expect(logger.error).not.toHaveBeenCalled();
   });
 });

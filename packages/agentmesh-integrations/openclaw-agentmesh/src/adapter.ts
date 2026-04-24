@@ -347,10 +347,10 @@ export function registerOpenClawPluginHooks(
   configured: boolean;
   adapter?: OpenClawGovernanceAdapter;
   reason?: string;
-} {
+  } {
   if (!hasPluginPolicyConfig(api.pluginConfig)) {
-    const reason = buildMissingPluginConfigMessage();
-    api.logger?.warn?.(reason);
+    const reason = buildUnconfiguredPluginMessage();
+    api.logger?.info?.(reason);
     return {
       configured: false,
       reason,
@@ -930,9 +930,9 @@ function hasPluginPolicyConfig(pluginConfig: Record<string, unknown> | undefined
   return Array.isArray(policies) && policies.length > 0;
 }
 
-function buildMissingPluginConfigMessage(): string {
+function buildUnconfiguredPluginMessage(): string {
   return [
-    "AGT OpenClaw plugin is installed but not configured yet.",
-    'Add plugins.entries.agentmesh-openclaw.config.policyFile or a non-empty config.policies array, then restart OpenClaw.',
+    "AGT OpenClaw plugin is installed but inactive until you add configuration.",
+    "Add plugins.entries.agentmesh-openclaw.config.policyFile or a non-empty config.policies array, then restart OpenClaw.",
   ].join(" ");
 }
