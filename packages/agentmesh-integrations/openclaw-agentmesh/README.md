@@ -27,6 +27,8 @@ If you want OpenClaw to install it through the plugin system:
 openclaw plugins install @microsoft/agentmesh-openclaw
 ```
 
+If the plugin is installed before you add `policyFile` or inline `policies`, it now loads in a **not configured yet** state and logs a warning instead of failing during `register(api)`. After you add config, restart OpenClaw so the plugin can register hooks.
+
 Or install it directly with npm:
 
 ```bash

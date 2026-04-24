@@ -112,4 +112,34 @@ describe("native OpenClaw plugin entry", () => {
     expect(logger.error).not.toHaveBeenCalled();
     expect(logger.info).toHaveBeenCalledOnce();
   });
+
+  it("loads without registering hooks when policy config is missing", () => {
+    const registrations: Array<{
+      hook: string | string[];
+      handler: (event: unknown) => Promise<unknown> | unknown;
+    }> = [];
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
+    const api: OpenClawPluginApi = {
+      id: "agentmesh-openclaw",
+      name: "AgentMesh OpenClaw Governance",
+      logger,
+      registerHook(hook, handler) {
+        registrations.push({ hook, handler });
+      },
+    };
+
+    pluginEntry.register(api);
+
+    expect(registrations).toHaveLength(0);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("installed but not configured yet"),
+    );
+    expect(logger.info).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
 });

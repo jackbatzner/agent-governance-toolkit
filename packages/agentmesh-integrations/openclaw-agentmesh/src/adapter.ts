@@ -34,6 +34,7 @@ import type {
   OpenClawInternalHookEvent,
   OpenClawMcpScanResult,
   OpenClawPluginApi,
+  OpenClawPluginRegistrationResult,
   OpenClawPolicyEngine,
 } from "./types";
 
@@ -343,7 +344,16 @@ export function registerOpenClawPluginHooks(
   options?: {
     cwd?: string;
   },
-): OpenClawGovernanceAdapter {
+): OpenClawPluginRegistrationResult {
+  if (!hasPluginPolicyConfig(api.pluginConfig)) {
+    const reason = buildMissingPluginConfigMessage();
+    api.logger?.warn?.(reason);
+    return {
+      configured: false,
+      reason,
+    };
+  }
+
   const adapter = createOpenClawGovernanceAdapterFromPluginConfig(
     api.pluginConfig,
     options,
@@ -385,7 +395,10 @@ export function registerOpenClawPluginHooks(
     `Registered AGT OpenClaw plugin hooks with ${countPolicies(api.pluginConfig)} configured policy source(s).`,
   );
 
-  return adapter;
+  return {
+    configured: true,
+    adapter,
+  };
 }
 
 export function createOpenClawHookEventHandler(
@@ -898,4 +911,25 @@ function readOptionalPolicies(value: unknown): Policy[] | undefined {
     throw new OpenClawGovernanceConfigError('"policies" must be an array when provided.');
   }
   return value as Policy[];
+}
+
+function hasPluginPolicyConfig(pluginConfig: Record<string, unknown> | undefined): boolean {
+  if (!pluginConfig) {
+    return false;
+  }
+
+  const policyFile = pluginConfig.policyFile;
+  if (typeof policyFile === "string" && policyFile.trim().length > 0) {
+    return true;
+  }
+
+  const policies = pluginConfig.policies;
+  return Array.isArray(policies) && policies.length > 0;
+}
+
+function buildMissingPluginConfigMessage(): string {
+  return [
+    "AGT OpenClaw plugin is installed but not configured yet.",
+    'Add plugins.entries.agentmesh-openclaw.config.policyFile or a non-empty config.policies array, then restart OpenClaw.',
+  ].join(" ");
 }
