@@ -34,7 +34,6 @@ import type {
   OpenClawInternalHookEvent,
   OpenClawMcpScanResult,
   OpenClawPluginApi,
-  OpenClawPluginRegistrationResult,
   OpenClawPolicyEngine,
 } from "./types";
 
@@ -344,7 +343,11 @@ export function registerOpenClawPluginHooks(
   options?: {
     cwd?: string;
   },
-): OpenClawPluginRegistrationResult {
+): {
+  configured: boolean;
+  adapter?: OpenClawGovernanceAdapter;
+  reason?: string;
+} {
   if (!hasPluginPolicyConfig(api.pluginConfig)) {
     const reason = buildMissingPluginConfigMessage();
     api.logger?.warn?.(reason);
