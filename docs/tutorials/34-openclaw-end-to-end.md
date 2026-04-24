@@ -292,6 +292,20 @@ If you want a quick parse check:
 cat config/openclaw-governance.policies.json | jq .
 ```
 
+If you want to create or edit the file in `vim` instead:
+
+```bash
+vim config/openclaw-governance.policies.json
+```
+
+In `vim`:
+
+1. press `i` to enter insert mode
+2. paste the JSON policy content
+3. press `Esc`
+4. type `:wq`
+5. press Enter
+
 **`config/openclaw-governance.policies.json`**
 
 ```json
@@ -368,6 +382,20 @@ Then find the active OpenClaw config file:
 ```bash
 openclaw gateway status --deep --require-rpc
 ```
+
+Open that config file in `vim`, for example:
+
+```bash
+vim ~/.openclaw/config.yaml
+```
+
+In `vim`:
+
+1. press `i` to enter insert mode
+2. add or update the `plugins.entries.agentmesh-openclaw` block
+3. press `Esc`
+4. type `:wq`
+5. press Enter
 
 Update the active config file so it includes this block under `plugins.entries`:
 
