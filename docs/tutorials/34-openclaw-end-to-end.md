@@ -386,13 +386,13 @@ openclaw gateway status --deep --require-rpc
 Open that config file in `vim`, for example:
 
 ```bash
-vim ~/.openclaw/config.yaml
+vim ~/.openclaw/config.json
 ```
 
 In `vim`:
 
 1. press `i` to enter insert mode
-2. add or update the `plugins.entries.agentmesh-openclaw` block
+2. add or update the `plugins.entries.agentmesh-openclaw` JSON block
 3. press `Esc`
 4. type `:wq`
 5. press Enter
