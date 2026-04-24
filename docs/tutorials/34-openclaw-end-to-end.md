@@ -30,6 +30,40 @@ Use this with:
 - the [OpenClaw advanced integration and operations guide](../integrations/openclaw-adapter.md)
 - the [OpenClaw AKS protection appendix](../deployment/openclaw-aks-protection.md)
 
+## What this integration helps with
+
+This integration is useful when you want to add a governance decision point **before** OpenClaw executes a tool.
+
+That gives you practical benefits:
+
+1. one place to express allow / deny / review rules
+2. a consistent way to pause sensitive actions for human approval
+3. an audit trail around proposed and completed tool usage
+4. early screening of MCP tool definitions before they are enabled
+
+## What this integration does not do by itself
+
+This guide is intentionally honest about the boundary:
+
+1. AGT does **not** sandbox OpenClaw
+2. AGT does **not** replace Kubernetes, network policy, secret management, or workload identity
+3. AGT does **not** make a dangerous tool safe if the runtime still has another way to execute it
+4. AGT does **not** ship a complete approval inbox or reviewer workflow for OpenClaw
+5. MCP scanning is a **risk signal**, not a proof that a tool is safe
+
+Treat AGT here as a **protective control in front of tool execution**, not as the only security boundary.
+
+## What still needs to be done in a real deployment
+
+Before calling this production-ready for your environment, most teams still need to:
+
+1. prove the governed hook path is the only path to tool execution
+2. put least-privilege credentials behind the tools OpenClaw can call
+3. export audit records to a durable sink outside process memory
+4. define who approves `review` decisions and how approval resumes execution
+5. add runtime containment with container policy, filesystem controls, and network restrictions
+6. run scenario tests for prompt injection, risky tool combinations, and policy bypass attempts
+
 ## Prerequisites
 
 You need:

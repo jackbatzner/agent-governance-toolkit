@@ -67,6 +67,28 @@ Use the sections in this guide based on your audience or goal:
 | Approval signal | `review` decision + `approvers` list | Approval UX, queueing, reviewer identity, and resume behavior |
 | Runtime isolation | Not part of the adapter | OpenClaw sandboxing, container policy, network policy, secrets handling |
 
+## Honest boundary
+
+Use this adapter when you want a **governance gate in front of tool execution**. That is valuable, but it is not the same as owning the whole runtime security story.
+
+What the adapter does well:
+
+1. evaluate tool calls before execution
+2. block or review risky actions
+3. rewrite parameters when policy allows that pattern
+4. emit audit evidence around tool execution
+5. scan MCP tool definitions before registration
+
+What the adapter does not do by itself:
+
+1. sandbox OpenClaw
+2. isolate the container or pod
+3. provide a full approval product for operators
+4. guarantee protection if another execution path bypasses the governed hook
+5. prove an MCP tool is safe just because scanning found no issue
+
+That is why this guide keeps separating **adapter responsibilities** from **OpenClaw and platform responsibilities**.
+
 ## Preferred integration model: native plugin first
 
 For most developers, the best path is:
@@ -135,6 +157,16 @@ Choose the topology that matches how much separation you need between OpenClaw a
 ### Important boundary
 
 The adapter is an **integration library**, not a full OpenClaw control plane. It does not automatically discover your sidecar, talk to a shared governance API, or create approval workflows for you. Those are deployment decisions you wire around the adapter.
+
+## What still needs to be done after the baseline works
+
+Most teams should expect follow-on work in these areas:
+
+1. verify that all sensitive tools really flow through the governed `before_tool_call` path
+2. define a real approval operating model, not just a technical `review` signal
+3. export audits to durable logging and retention systems
+4. reduce tool privileges and credential scope so an allowed action still has limited blast radius
+5. test failure modes such as policy-engine errors, audit-export outages, and prompt-driven abuse attempts
 
 ## Practical integration model
 

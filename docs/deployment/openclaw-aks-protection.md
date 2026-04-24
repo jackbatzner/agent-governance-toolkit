@@ -24,6 +24,22 @@ This deployment pattern gives you a practical split of responsibility:
 
 That is the value proposition: AGT reduces risky tool execution, while AKS and OpenClaw still provide the runtime and platform controls around it.
 
+## Honest boundary on AKS
+
+Running this on AKS does **not** change the basic split of responsibility:
+
+1. AGT helps decide whether a tool call should run
+2. OpenClaw still owns execution
+3. AKS and Azure still own workload isolation, identity, networking, and secret handling
+
+That means AGT is a useful **protective control**, but it is not a substitute for:
+
+- pod security and container hardening
+- network policy and egress control
+- least-privilege Azure identity
+- secret rotation and credential scoping
+- operational review of approvals and audit output
+
 ## Scenario
 
 Contoso is deploying a customer support assistant on AKS. The assistant can:
@@ -77,6 +93,16 @@ Keep that split in mind while reading the rest of the page: AGT governs agent be
 | **Adapter + shared governance service** | Same in-process decision with central policy/audit backends through custom integrations | Service auth, network path, approval systems, tenancy boundaries | Best for multi-agent fleets that want central operations |
 
 > **Important:** The OpenClaw adapter does not automatically discover or call a sidecar or a shared service. Those are deployment choices you implement around the adapter.
+
+## What still needs to be done for production confidence
+
+Even after the baseline deployment works, most teams still need to:
+
+1. prove the governed hook path is the only path to sensitive tool execution
+2. validate that approvals are routed to real humans with clear ownership and escalation
+3. export audit records out of the pod and retain them outside the application lifecycle
+4. lock down pod egress, filesystem mounts, service account scope, and Azure permissions
+5. test prompt-injection and policy-bypass scenarios against the actual deployed workload
 
 ## Compatibility and assumptions
 
