@@ -16,14 +16,14 @@ governed agents in each ecosystem.
 | **Audit Logging** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **MCP Security** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Execution Rings** | ✅ | — | ✅ | ✅ | ✅ |
-| **SRE / SLOs** | ✅ | — | ✅ | — | ✅ |
+| **SRE / SLOs** | ✅ | — | ✅ | — | — |
 | **Kill Switch** | ✅ | — | ✅ | — | — |
 | **Lifecycle Management** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Framework Integrations** | ✅ | — | ✅ | — | ✅ |
+| **Framework Integrations** | ✅ | — | ✅ | — | — |
 | **Unified CLI** | ✅ | — | — | — | — |
 | **Governance Dashboard** | ✅ | — | — | — | — |
-| **Shadow AI Discovery** | ✅ | — | — | — | ✅ |
-| **Prompt Defense Evaluator** | ✅ | — | — | — | ✅ |
+| **Shadow AI Discovery** | ✅ | — | — | — | — |
+| **Prompt Defense Evaluator** | ✅ | — | — | — | — |
 
 **Legend:** ✅ Implemented · ◑ Partial · — Not yet available
 
@@ -39,8 +39,8 @@ to build governed agents in any language:
 | Primitive | What It Does | Python | TS | .NET | Rust | Go |
 |---|---|---|---|---|---|---|
 | Policy evaluation | Evaluate actions against rules before execution | `PolicyEvaluator` | `PolicyEngine` | `PolicyEngine` | `PolicyEngine` | `PolicyEngine` |
-| Agent identity | Cryptographic credentials | `AgentIdentity` | `AgentIdentity` | `AgentIdentity` (.NET 8 compatibility signing, delegation, JWK/JWKS, DID docs) | `Identity` | `AgentIdentity` |
-| Trust scoring | 0–1000 score based on behavior | `TrustEngine` | `TrustEngine` | `TrustStore` | `TrustEngine` | `TrustManager` |
+| Agent identity | Cryptographic credentials | `AgentIdentity` | `AgentIdentity` | `AgentIdentity` (.NET 8 compatibility signing, delegation, JWK/JWKS, DID docs) | `Identity` | `Identity` |
+| Trust scoring | 0–1000 score based on behavior | `TrustEngine` | `TrustEngine` | `TrustStore` | `TrustEngine` | `TrustEngine` |
 | Audit logging | Append-only action log | `AuditLogger` | `AuditLogger` | `AuditLogger` | `AuditLogger` | `AuditLogger` |
 
 ### Python-Only Capabilities
@@ -120,37 +120,18 @@ full governance stack.
 **Module:** `github.com/microsoft/agent-governance-toolkit/agent-governance-golang` ·
 **Source:** [`agent-governance-golang/`](../agent-governance-golang/)
 
-| Python parity area | Go status |
-|---|---|
-| Core governance primitives | ✅ Parity |
-| MCP security | ✅ Parity |
-| Execution rings | ✅ Parity |
-| Lifecycle management | ✅ Parity |
-| SRE / SLOs | ✅ Parity |
-| Framework integrations | ✅ Parity |
-| Shadow AI discovery | ✅ Parity |
-| Prompt defense | ✅ Parity |
-| OPA / Rego / Cedar policy backends | ✅ Parity |
-| Unified CLI and governance dashboard | — Python only today |
-
 | File | Features |
 |------|----------|
-| `policy.go` | Rule-based policy evaluation, wildcard/conditional matching, YAML loading, rate limiting, approval gates |
-| `identity.go` | Ed25519 identity generation, DID creation, signing/verification, JSON export/import |
-| `trust.go` | Trust scoring, tier classification, peer verification, optional disk persistence |
-| `audit.go` | Hash-chained audit logging, filtering, JSON export, retention cap |
-| `mcp.go` | MCP security scanning — tool poisoning, typosquatting, hidden chars/homoglyphs, rug pull |
+| `policy.go` | Rule-based policy evaluation, conflict resolution |
+| `identity.go` | Ed25519 identity generation, DID creation |
+| `trust.go` | Trust scoring, tier classification, behavioral events |
+| `audit.go` | Structured audit logging |
+| `mcp.go` | MCP security scanning — tool poisoning, typosquatting, hidden chars, rug pull |
 | `rings.go` | 4-tier execution privilege rings with default-deny access control |
-| `lifecycle.go` | 8-state lifecycle manager with validated transitions and transition history |
-| `client.go` | High-level client combining identity, trust, policy, and audit |
-| `policy_backends.go` | OPA/Rego remote + CLI + built-in evaluation, Cedar CLI + built-in evaluation |
-| `slo.go` | SLO objectives, event recording, latency/availability evaluation, error budget tracking |
-| `middleware.go` | Composable governance middleware stack, `net/http` adapter, capability guards, prompt defense, audit, and optional SLO tracking |
-| `discovery.go` | Structured shadow discovery models plus text, process, config-path, current-host, and GitHub repository scanners |
-| `promptdefense.go` | Prompt injection, prompt exfiltration, credential exfiltration, and approval-bypass detection |
-| `metrics.go` | Lightweight governance metrics recorder stubs |
+| `lifecycle.go` | 8-state lifecycle manager with validated transitions |
+| `client.go` | High-level client combining all primitives |
 
-**Roadmap:** Additional transport adapters beyond `net/http`, plus deeper discovery heuristics and integrations.
+**Roadmap:** Framework integrations, gRPC transport, SRE primitives.
 
 ---
 
@@ -159,8 +140,8 @@ full governance stack.
 | Backend | Python | TS | .NET | Rust | Go |
 |---------|:---:|:---:|:---:|:---:|:---:|
 | **YAML rules** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **OPA / Rego** | ✅ | — | — | — | ✅ |
-| **Cedar** | ✅ | — | — | — | ✅ |
+| **OPA / Rego** | ✅ | — | — | — | — |
+| **Cedar** | ✅ | — | — | — | — |
 | **Programmatic** | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
