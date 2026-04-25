@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OpenAI" Version="2.10.0" />
-    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <ProjectReference Include="..\..\..\..\agent-governance-dotnet\src\AgentGovernance\AgentGovernance.csproj" />
+    <Compile Include="..\..\shared-dotnet\DemoCommon.cs" Link="DemoCommon.cs" />
   </ItemGroup>
 
   <ItemGroup>
