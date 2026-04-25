@@ -16,20 +16,16 @@ governed agents in each ecosystem.
 | **Audit Logging** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **MCP Security** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Execution Rings** | ✅ | — | ✅ | ✅ | ✅ |
-| **SRE / SLOs** | ✅ | — | ✅ | — | — |
+| **SRE / SLOs** | ✅ | — | ✅ | — | ✅ |
 | **Kill Switch** | ✅ | — | ✅ | — | — |
 | **Lifecycle Management** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Framework Integrations** | ✅ | — | ✅ | — | — |
+| **Framework Integrations** | ✅ | — | ✅ | — | ✅ |
 | **Unified CLI** | ✅ | — | — | — | — |
 | **Governance Dashboard** | ✅ | — | — | — | — |
-| **Shadow AI Discovery** | ✅ | — | ✅ | — | — |
-| **Prompt Defense Evaluator** | ✅ | — | ✅ | — | — |
+| **Shadow AI Discovery** | ✅ | — | — | — | ✅ |
+| **Prompt Defense Evaluator** | ✅ | — | — | — | ✅ |
 
 **Legend:** ✅ Implemented · ◑ Partial · — Not yet available
-
-| Honest note | Current truth |
-|---|---|
-| `.NET` identity/auth | Much stronger than before: compatibility signing, verification-only flows, JWK/JWKS/DID export, delegation, and native asymmetric **ECDSA P-256** are implemented. It stays **◑** in the summary because the other SDKs use native **Ed25519**, so cross-language identity parity is still not complete. |
 
 ---
 
@@ -43,8 +39,8 @@ to build governed agents in any language:
 | Primitive | What It Does | Python | TS | .NET | Rust | Go |
 |---|---|---|---|---|---|---|
 | Policy evaluation | Evaluate actions against rules before execution | `PolicyEvaluator` | `PolicyEngine` | `PolicyEngine` | `PolicyEngine` | `PolicyEngine` |
-| Agent identity | Cryptographic credentials | `AgentIdentity` | `AgentIdentity` | `AgentIdentity` (.NET 8 compatibility signing, native ECDSA P-256 signing, delegation, JWK/JWKS, DID docs) | `Identity` | `Identity` |
-| Trust scoring | 0–1000 score based on behavior | `TrustEngine` | `TrustEngine` | `TrustStore` | `TrustEngine` | `TrustEngine` |
+| Agent identity | Cryptographic credentials | `AgentIdentity` | `AgentIdentity` | `AgentIdentity` (.NET 8 compatibility signing, delegation, JWK/JWKS, DID docs) | `Identity` | `AgentIdentity` |
+| Trust scoring | 0–1000 score based on behavior | `TrustEngine` | `TrustEngine` | `TrustStore` | `TrustEngine` | `TrustManager` |
 | Audit logging | Append-only action log | `AuditLogger` | `AuditLogger` | `AuditLogger` | `AuditLogger` | `AuditLogger` |
 
 ### Python-Only Capabilities
@@ -63,7 +59,7 @@ governance stack for enterprise deployments:
 ### TypeScript package
 
 **Package:** [`@microsoft/agentmesh-sdk`](https://www.npmjs.com/package/@microsoft/agentmesh-sdk) ·
-**Source:** [`packages/agent-mesh/sdks/typescript/`](../packages/agent-mesh/sdks/typescript/)
+**Source:** [`agent-governance-typescript/`](../agent-governance-typescript/)
 
 | Module | Features |
 |--------|----------|
@@ -84,8 +80,8 @@ governance stack for enterprise deployments:
 
 | Namespace | Features |
 |-----------|----------|
-| `Policy` | `PolicyEngine` with YAML/JSON policy loading, organization scope, richer decision metadata, and fail-closed OPA/Rego + Cedar backends |
-| `Trust` | `AgentIdentity`, `IdentityRegistry`, `FileTrustStore`, compatibility + native ECDSA P-256 signing, delegation helpers, JWK/JWKS, DID document export |
+| `Policy` | `PolicyEngine` with YAML/JSON policy loading, organization scope, and richer decision metadata |
+| `Trust` | `AgentIdentity`, `IdentityRegistry`, `FileTrustStore`, delegation helpers, JWK/JWKS, DID document export |
 | `Audit` | `AuditLogger`, `AuditEmitter` with structured events |
 | `Hypervisor` | `ExecutionRings` (4-tier), `SagaOrchestrator`, `KillSwitch` |
 | `Lifecycle` | `LifecycleManager` with 8-state machine and validated transitions |
@@ -93,13 +89,9 @@ governance stack for enterprise deployments:
 | `Integration` | `GovernanceMiddleware` for ASP.NET / Agent Framework |
 | `RateLimiting` | Token bucket rate limiter |
 | `Telemetry` | OpenTelemetry integration |
-| `Security` | `PromptInjectionDetector`, `PromptDefenseEvaluator` |
-| `Discovery` | `AgentInventory`, `ConfigScanner`, `ProcessScanner`, `Reconciler`, `RiskScorer` |
 | `Mcp` | `McpSecurityScanner` (poisoning, typosquatting, hidden instructions, rug pull, schema abuse, cross-server), `McpResponseSanitizer`, `McpCredentialRedactor`, `McpGateway` |
 
 **Roadmap:** Native asymmetric Ed25519 signing once the target runtime supports it broadly, plus full lifecycle persistence.
-
-> **Note:** .NET identity/auth is now counted as implemented because it supports verification-only identities, JWK/JWKS/DID export, delegation, and native asymmetric signing via ECDSA P-256. It still differs from Python/TypeScript/Go/Rust, which use native Ed25519.
 
 ### Rust crate
 
@@ -128,18 +120,37 @@ full governance stack.
 **Module:** `github.com/microsoft/agent-governance-toolkit/agent-governance-golang` ·
 **Source:** [`agent-governance-golang/`](../agent-governance-golang/)
 
+| Python parity area | Go status |
+|---|---|
+| Core governance primitives | ✅ Parity |
+| MCP security | ✅ Parity |
+| Execution rings | ✅ Parity |
+| Lifecycle management | ✅ Parity |
+| SRE / SLOs | ✅ Parity |
+| Framework integrations | ✅ Parity |
+| Shadow AI discovery | ✅ Parity |
+| Prompt defense | ✅ Parity |
+| OPA / Rego / Cedar policy backends | ✅ Parity |
+| Unified CLI and governance dashboard | — Python only today |
+
 | File | Features |
 |------|----------|
-| `policy.go` | Rule-based policy evaluation, conflict resolution |
-| `identity.go` | Ed25519 identity generation, DID creation |
-| `trust.go` | Trust scoring, tier classification, behavioral events |
-| `audit.go` | Structured audit logging |
-| `mcp.go` | MCP security scanning — tool poisoning, typosquatting, hidden chars, rug pull |
+| `policy.go` | Rule-based policy evaluation, wildcard/conditional matching, YAML loading, rate limiting, approval gates |
+| `identity.go` | Ed25519 identity generation, DID creation, signing/verification, JSON export/import |
+| `trust.go` | Trust scoring, tier classification, peer verification, optional disk persistence |
+| `audit.go` | Hash-chained audit logging, filtering, JSON export, retention cap |
+| `mcp.go` | MCP security scanning — tool poisoning, typosquatting, hidden chars/homoglyphs, rug pull |
 | `rings.go` | 4-tier execution privilege rings with default-deny access control |
-| `lifecycle.go` | 8-state lifecycle manager with validated transitions |
-| `client.go` | High-level client combining all primitives |
+| `lifecycle.go` | 8-state lifecycle manager with validated transitions and transition history |
+| `client.go` | High-level client combining identity, trust, policy, and audit |
+| `policy_backends.go` | OPA/Rego remote + CLI + built-in evaluation, Cedar CLI + built-in evaluation |
+| `slo.go` | SLO objectives, event recording, latency/availability evaluation, error budget tracking |
+| `middleware.go` | Composable governance middleware stack, `net/http` adapter, capability guards, prompt defense, audit, and optional SLO tracking |
+| `discovery.go` | Structured shadow discovery models plus text, process, config-path, current-host, and GitHub repository scanners |
+| `promptdefense.go` | Prompt injection, prompt exfiltration, credential exfiltration, and approval-bypass detection |
+| `metrics.go` | Lightweight governance metrics recorder stubs |
 
-**Roadmap:** Framework integrations, gRPC transport, SRE primitives.
+**Roadmap:** Additional transport adapters beyond `net/http`, plus deeper discovery heuristics and integrations.
 
 ---
 
@@ -148,8 +159,8 @@ full governance stack.
 | Backend | Python | TS | .NET | Rust | Go |
 |---------|:---:|:---:|:---:|:---:|:---:|
 | **YAML rules** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **OPA / Rego** | ✅ | — | ✅ | — | — |
-| **Cedar** | ✅ | — | ✅ | — | — |
+| **OPA / Rego** | ✅ | — | — | — | ✅ |
+| **Cedar** | ✅ | — | — | — | ✅ |
 | **Programmatic** | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
