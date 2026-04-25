@@ -51,9 +51,13 @@ governance stack for enterprise deployments:
 | Capability | Package | Description |
 |---|---|---|
 | **Replay Debugging** | `agent-sre` | Deterministic replay of agent sessions |
+| **Shadow AI Discovery** | `agent-discovery` | Find unregistered agents in processes, configs, repos |
 | **Governance Dashboard** | `demo/` | Real-time fleet visibility (Streamlit) |
 | **Unified CLI (`agt`)** | `agent-compliance` | `agt verify`, `agt doctor`, `agt lint-policy` |
+| **Prompt Defense** | `agent-compliance` | 12-vector prompt injection audit |
 | **OWASP Verification** | `agent-compliance` | ASI 2026 compliance attestation |
+| **OPA/Rego Policies** | `agent-os` | Evaluate policies via Open Policy Agent |
+| **Cedar Policies** | `agent-os` | Evaluate policies via Cedar (Amazon Verified Permissions) |
 | **20+ Framework Adapters** | `agentmesh-integrations` | LangChain, CrewAI, AutoGen, OpenAI Agents, Google ADK, etc. |
 
 ### TypeScript package
