@@ -22,10 +22,14 @@ governed agents in each ecosystem.
 | **Framework Integrations** | ✅ | — | ✅ | — | — |
 | **Unified CLI** | ✅ | — | — | — | — |
 | **Governance Dashboard** | ✅ | — | — | — | — |
-| **Shadow AI Discovery** | ✅ | — | — | — | — |
-| **Prompt Defense Evaluator** | ✅ | — | — | — | — |
+| **Shadow AI Discovery** | ✅ | — | ✅ | — | — |
+| **Prompt Defense Evaluator** | ✅ | — | ✅ | — | — |
 
 **Legend:** ✅ Implemented · ◑ Partial · — Not yet available
+
+| Honest note | Current truth |
+|---|---|
+| `.NET` identity/auth | Much stronger than before: compatibility signing, verification-only flows, JWK/JWKS/DID export, delegation, and native asymmetric **ECDSA P-256** are implemented. It stays **◑** in the summary because the other SDKs use native **Ed25519**, so cross-language identity parity is still not complete. |
 
 ---
 
@@ -39,7 +43,7 @@ to build governed agents in any language:
 | Primitive | What It Does | Python | TS | .NET | Rust | Go |
 |---|---|---|---|---|---|---|
 | Policy evaluation | Evaluate actions against rules before execution | `PolicyEvaluator` | `PolicyEngine` | `PolicyEngine` | `PolicyEngine` | `PolicyEngine` |
-| Agent identity | Cryptographic credentials | `AgentIdentity` | `AgentIdentity` | `AgentIdentity` (.NET 8 compatibility signing, delegation, JWK/JWKS, DID docs) | `Identity` | `Identity` |
+| Agent identity | Cryptographic credentials | `AgentIdentity` | `AgentIdentity` | `AgentIdentity` (.NET 8 compatibility signing, native ECDSA P-256 signing, delegation, JWK/JWKS, DID docs) | `Identity` | `Identity` |
 | Trust scoring | 0–1000 score based on behavior | `TrustEngine` | `TrustEngine` | `TrustStore` | `TrustEngine` | `TrustEngine` |
 | Audit logging | Append-only action log | `AuditLogger` | `AuditLogger` | `AuditLogger` | `AuditLogger` | `AuditLogger` |
 
@@ -51,13 +55,9 @@ governance stack for enterprise deployments:
 | Capability | Package | Description |
 |---|---|---|
 | **Replay Debugging** | `agent-sre` | Deterministic replay of agent sessions |
-| **Shadow AI Discovery** | `agent-discovery` | Find unregistered agents in processes, configs, repos |
 | **Governance Dashboard** | `demo/` | Real-time fleet visibility (Streamlit) |
 | **Unified CLI (`agt`)** | `agent-compliance` | `agt verify`, `agt doctor`, `agt lint-policy` |
-| **Prompt Defense** | `agent-compliance` | 12-vector prompt injection audit |
 | **OWASP Verification** | `agent-compliance` | ASI 2026 compliance attestation |
-| **OPA/Rego Policies** | `agent-os` | Evaluate policies via Open Policy Agent |
-| **Cedar Policies** | `agent-os` | Evaluate policies via Cedar (Amazon Verified Permissions) |
 | **20+ Framework Adapters** | `agentmesh-integrations` | LangChain, CrewAI, AutoGen, OpenAI Agents, Google ADK, etc. |
 
 ### TypeScript package
@@ -84,8 +84,8 @@ governance stack for enterprise deployments:
 
 | Namespace | Features |
 |-----------|----------|
-| `Policy` | `PolicyEngine` with YAML/JSON policy loading, organization scope, and richer decision metadata |
-| `Trust` | `AgentIdentity`, `IdentityRegistry`, `FileTrustStore`, delegation helpers, JWK/JWKS, DID document export |
+| `Policy` | `PolicyEngine` with YAML/JSON policy loading, organization scope, richer decision metadata, and fail-closed OPA/Rego + Cedar backends |
+| `Trust` | `AgentIdentity`, `IdentityRegistry`, `FileTrustStore`, compatibility + native ECDSA P-256 signing, delegation helpers, JWK/JWKS, DID document export |
 | `Audit` | `AuditLogger`, `AuditEmitter` with structured events |
 | `Hypervisor` | `ExecutionRings` (4-tier), `SagaOrchestrator`, `KillSwitch` |
 | `Lifecycle` | `LifecycleManager` with 8-state machine and validated transitions |
@@ -93,9 +93,13 @@ governance stack for enterprise deployments:
 | `Integration` | `GovernanceMiddleware` for ASP.NET / Agent Framework |
 | `RateLimiting` | Token bucket rate limiter |
 | `Telemetry` | OpenTelemetry integration |
+| `Security` | `PromptInjectionDetector`, `PromptDefenseEvaluator` |
+| `Discovery` | `AgentInventory`, `ConfigScanner`, `ProcessScanner`, `Reconciler`, `RiskScorer` |
 | `Mcp` | `McpSecurityScanner` (poisoning, typosquatting, hidden instructions, rug pull, schema abuse, cross-server), `McpResponseSanitizer`, `McpCredentialRedactor`, `McpGateway` |
 
 **Roadmap:** Native asymmetric Ed25519 signing once the target runtime supports it broadly, plus full lifecycle persistence.
+
+> **Note:** .NET identity/auth is now counted as implemented because it supports verification-only identities, JWK/JWKS/DID export, delegation, and native asymmetric signing via ECDSA P-256. It still differs from Python/TypeScript/Go/Rust, which use native Ed25519.
 
 ### Rust crate
 
@@ -144,8 +148,8 @@ full governance stack.
 | Backend | Python | TS | .NET | Rust | Go |
 |---------|:---:|:---:|:---:|:---:|:---:|
 | **YAML rules** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **OPA / Rego** | ✅ | — | — | — | — |
-| **Cedar** | ✅ | — | — | — | — |
+| **OPA / Rego** | ✅ | — | ✅ | — | — |
+| **Cedar** | ✅ | — | ✅ | — | — |
 | **Programmatic** | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
