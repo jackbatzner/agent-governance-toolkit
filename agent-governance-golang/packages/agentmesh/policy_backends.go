@@ -29,25 +29,30 @@ const (
 
 // OPAOptions configures an OPA/Rego backend.
 type OPAOptions struct {
-	Mode        OPAMode
-	OPAURL      string
-	RegoPath    string
-	RegoContent string
-	Package     string
-	Query       string
-	Timeout     time.Duration
+	Mode OPAMode
+	// AllowBuiltinFallback permits auto mode to use the builtin evaluator when the OPA CLI is unavailable.
+	AllowBuiltinFallback bool
+	OPAURL               string
+	RegoPath             string
+	RegoContent          string
+	Package              string
+	Query                string
+	Timeout              time.Duration
 }
 
 // OPABackend evaluates execution contexts using OPA/Rego.
 type OPABackend struct {
-	mode        OPAMode
-	opaURL      string
-	regoContent string
-	packageName string
-	query       string
-	timeout     time.Duration
-	httpClient  *http.Client
+	mode                 OPAMode
+	allowBuiltinFallback bool
+	opaURL               string
+	regoContent          string
+	packageName          string
+	query                string
+	timeout              time.Duration
+	httpClient           *http.Client
 }
+
+var opaLookPath = exec.LookPath
 
 // NewOPABackend creates an OPA/Rego backend.
 func NewOPABackend(options OPAOptions) *OPABackend {
@@ -85,12 +90,13 @@ func NewOPABackend(options OPAOptions) *OPABackend {
 	}
 
 	return &OPABackend{
-		mode:        mode,
-		opaURL:      strings.TrimRight(opaURL, "/"),
-		regoContent: regoContent,
-		packageName: packageName,
-		query:       query,
-		timeout:     timeout,
+		mode:                 mode,
+		allowBuiltinFallback: options.AllowBuiltinFallback,
+		opaURL:               strings.TrimRight(opaURL, "/"),
+		regoContent:          regoContent,
+		packageName:          packageName,
+		query:                query,
+		timeout:              timeout,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
@@ -123,10 +129,18 @@ func (b *OPABackend) evaluateWithMode(context map[string]interface{}) (BackendDe
 		if b.regoContent == "" {
 			return BackendDecision{}, fmt.Errorf("opa backend requires rego content or file")
 		}
-		if _, err := exec.LookPath("opa"); err == nil {
+		if _, err := opaLookPath("opa"); err == nil {
 			return b.evaluateCLI(context)
 		}
-		return b.evaluateBuiltin(context)
+		if b.allowBuiltinFallback {
+			result, err := b.evaluateBuiltin(context)
+			if err != nil {
+				return BackendDecision{}, err
+			}
+			result.Reason = fmt.Sprintf("%s (auto fallback enabled)", result.Reason)
+			return result, nil
+		}
+		return BackendDecision{}, fmt.Errorf("opa auto mode requires the opa CLI; use builtin mode explicitly or set AllowBuiltinFallback to true")
 	}
 }
 
@@ -389,23 +403,28 @@ const (
 
 // CedarOptions configures a Cedar backend.
 type CedarOptions struct {
-	Mode          CedarMode
-	PolicyPath    string
-	PolicyContent string
-	EntitiesPath  string
-	Entities      []map[string]interface{}
-	SchemaPath    string
-	Timeout       time.Duration
+	Mode CedarMode
+	// AllowBuiltinFallback permits auto mode to use the builtin evaluator when the Cedar CLI is unavailable.
+	AllowBuiltinFallback bool
+	PolicyPath           string
+	PolicyContent        string
+	EntitiesPath         string
+	Entities             []map[string]interface{}
+	SchemaPath           string
+	Timeout              time.Duration
 }
 
 // CedarBackend evaluates execution contexts using Cedar policies.
 type CedarBackend struct {
-	mode          CedarMode
-	policyContent string
-	entities      []map[string]interface{}
-	schemaPath    string
-	timeout       time.Duration
+	mode                 CedarMode
+	allowBuiltinFallback bool
+	policyContent        string
+	entities             []map[string]interface{}
+	schemaPath           string
+	timeout              time.Duration
 }
+
+var cedarLookPath = exec.LookPath
 
 // NewCedarBackend creates a Cedar backend.
 func NewCedarBackend(options CedarOptions) *CedarBackend {
@@ -436,11 +455,12 @@ func NewCedarBackend(options CedarOptions) *CedarBackend {
 	}
 
 	return &CedarBackend{
-		mode:          mode,
-		policyContent: policyContent,
-		entities:      entities,
-		schemaPath:    options.SchemaPath,
-		timeout:       timeout,
+		mode:                 mode,
+		allowBuiltinFallback: options.AllowBuiltinFallback,
+		policyContent:        policyContent,
+		entities:             entities,
+		schemaPath:           options.SchemaPath,
+		timeout:              timeout,
 	}
 }
 
@@ -468,10 +488,18 @@ func (b *CedarBackend) evaluateWithMode(context map[string]interface{}) (Backend
 		if b.policyContent == "" {
 			return BackendDecision{}, fmt.Errorf("cedar backend requires policy content or file")
 		}
-		if _, err := exec.LookPath("cedar"); err == nil {
+		if _, err := cedarLookPath("cedar"); err == nil {
 			return b.evaluateCLI(context)
 		}
-		return b.evaluateBuiltin(context)
+		if b.allowBuiltinFallback {
+			result, err := b.evaluateBuiltin(context)
+			if err != nil {
+				return BackendDecision{}, err
+			}
+			result.Reason = fmt.Sprintf("%s (auto fallback enabled)", result.Reason)
+			return result, nil
+		}
+		return BackendDecision{}, fmt.Errorf("cedar auto mode requires the cedar CLI; use builtin mode explicitly or set AllowBuiltinFallback to true")
 	}
 }
 
