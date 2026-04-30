@@ -31,6 +31,9 @@ build governed agents in each ecosystem.
 > stronger native asymmetric identity flows, while the other SDKs still center on Ed25519-based
 > identity material.
 
+For a package-scoped OWASP MCP view, see
+[`docs/security/mcp-top10-language-coverage.md`](security/mcp-top10-language-coverage.md).
+
 ---
 
 ## Detailed Breakdown
