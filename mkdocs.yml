@@ -138,7 +138,6 @@ nav:
   - Security:
     - Threat Model: security/threat-model.md
     - OWASP Compliance: security/owasp-compliance.md
-    - MCP Top 10 Language Coverage: security/mcp-top10-language-coverage.md
     - Security Scanning: security/scanning.md
     - Tenant Isolation: security/tenant-isolation.md
   - Architecture Decisions:

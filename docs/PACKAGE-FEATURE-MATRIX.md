@@ -32,7 +32,7 @@ build governed agents in each ecosystem.
 > identity material.
 
 For a package-scoped OWASP MCP view, see
-[`docs/security/mcp-top10-language-coverage.md`](security/mcp-top10-language-coverage.md).
+[`docs/compliance/mcp-owasp-top10-mapping.md`](compliance/mcp-owasp-top10-mapping.md).
 
 ---
 
