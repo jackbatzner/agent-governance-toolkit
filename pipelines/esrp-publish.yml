@@ -100,6 +100,8 @@ parameters:
         path: packages/agent-mesh/packages/mcp-proxy
       - name: agent-governance-sdk
         path: agent-governance-typescript
+      - name: agent-governance-antigravity-cli
+        path: agent-governance-antigravity-cli
       - name: agent-os-copilot-extension
         path: packages/agent-os/extensions/copilot
       - name: agentos-mcp-server
@@ -654,4 +656,3 @@ stages:
                 echo "Tagged ${TAG} — Go module proxy will index automatically"
               fi
             displayName: 'Tag Go module for proxy indexing'
-

@@ -27,6 +27,7 @@ LlamaIndex
 manylinux
 markdown
 Microsoft
+antigravity
 Moltbook
 Molty
 msinternal

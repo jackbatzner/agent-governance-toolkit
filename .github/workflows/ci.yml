@@ -48,6 +48,7 @@ jobs:
               - 'agent-governance-dotnet/**'
             typescript:
               - 'agent-governance-typescript/**'
+              - 'agent-governance-antigravity-cli/**'
               - 'packages/agent-os/extensions/**'
               - 'packages/agentmesh-integrations/mastra-agentmesh/**'
               - 'packages/agentmesh-integrations/copilot-governance/**'
@@ -428,6 +429,8 @@ jobs:
             path: agent-governance-typescript
           - name: agentmesh-api
             path: packages/agent-mesh/services/api
+          - name: agent-governance-antigravity-cli
+            path: agent-governance-antigravity-cli
           - name: agent-os-copilot-extension
             path: packages/agent-os/extensions/copilot
           - name: agentos-mcp-server
@@ -517,4 +520,3 @@ jobs:
             exit 1
           fi
           echo "All jobs passed or were correctly skipped"
-

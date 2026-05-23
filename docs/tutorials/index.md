@@ -49,3 +49,4 @@
 | 20 | [TypeScript package](20-typescript-sdk.md) | Agent governance in TypeScript |
 | 21 | [Rust crate](21-rust-sdk.md) | Agent governance in Rust |
 | 22 | [Go module](22-go-sdk.md) | Agent governance in Go |
+| 52 | [Antigravity CLI governance](52-antigravity-cli-governance.md) | Install governance policies for Antigravity CLI with hooks, commands, and MCP checks |

@@ -17,6 +17,7 @@
 /packages/agent-marketplace/ @microsoft/agent-governance-toolkit
 /packages/agent-runtime/     @microsoft/agent-governance-toolkit
 /packages/agentmesh-integrations/ @microsoft/agent-governance-toolkit
+/agent-governance-antigravity-cli/ @microsoft/agent-governance-toolkit
 
 # Security-sensitive paths — require maintainer review, no exceptions
 /.github/                    @microsoft/agent-governance-toolkit

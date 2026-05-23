@@ -39,5 +39,6 @@ AGT provides 12 packages covering every layer of agent governance.
 
 | Package | Language | Install |
 |---------|---------|---------|
+| [Antigravity CLI governance package](antigravity-cli-governance.md) | Antigravity CLI / Node.js | `npm install -g @microsoft/agent-governance-antigravity-cli && agt-antigravity install` |
 | [.NET package](dotnet-sdk.md) | C# / .NET | `dotnet add package Microsoft.AgentGovernance` |
 | [VS Code Extension](agent-os-vscode.md) | VS Code | Install from marketplace |
