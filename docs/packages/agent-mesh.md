@@ -35,9 +35,9 @@
 <p align="center">
   <a href="https://github.com/langgenius/dify-plugins/pull/2060"><img src="https://img.shields.io/badge/Dify-65K_⭐_Merged-success?style=flat-square" alt="Dify"></a>
   <a href="https://github.com/run-llama/llama_index/pull/20644"><img src="https://img.shields.io/badge/LlamaIndex-47K_⭐_Merged-success?style=flat-square" alt="LlamaIndex"></a>
-  <a href="https://github.com/microsoft/agent-lightning/pull/478"><img src="https://img.shields.io/badge/Agent--Lightning-15K_⭐_Merged-success?style=flat-square" alt="Agent-Lightning"></a>
+  <a href="https://github.com/microsoft/agent-governance-python/agent-lightning/pull/478"><img src="https://img.shields.io/badge/Agent--Lightning-15K_⭐_Merged-success?style=flat-square" alt="Agent-Lightning"></a>
   <a href="https://pypi.org/project/langgraph-trust/"><img src="https://img.shields.io/badge/LangGraph-PyPI-blue?style=flat-square" alt="LangGraph"></a>
-  <a href="https://pypi.org/project/openai-agents-trust/"><img src="https://img.shields.io/badge/OpenAI_Agents-PyPI-blue?style=flat-square" alt="OpenAI Agents"></a>
+  <a href="https://pypi.org/project/agentmesh-openai-agents-trust/"><img src="https://img.shields.io/badge/OpenAI_Agents-PyPI-blue?style=flat-square" alt="OpenAI Agents"></a>
   <a href="https://clawhub.ai/microsoft/agentmesh-governance"><img src="https://img.shields.io/badge/OpenClaw-ClawHub-purple?style=flat-square" alt="OpenClaw"></a>
 </p>
 
@@ -59,7 +59,7 @@
 <td align="center"><h3>6</h3><sub>Framework Integrations</sub></td>
 <td align="center"><h3>170K+</h3><sub>Combined Stars of<br/>Integrated Projects</sub></td>
 <td align="center"><h3>4</h3><sub>Protocol Bridges<br/>(A2A · MCP · IATP · AI Card)</sub></td>
-<td align="center"><h3>&lt;1ms p99</h3><sub><a href="benchmarks/results/BENCHMARKS.md">Full Governance Pipeline</a></sub></td>
+<td align="center"><h3>&lt;1ms p99</h3><sub><a href="agent-governance-python/benchmarks/results/BENCHMARKS.md">Full Governance Pipeline</a></sub></td>
 </tr>
 </table>
 
@@ -265,11 +265,11 @@ Claude will now route tool calls through AgentMesh for policy enforcement and tr
 # Initialize a governed agent in 30 seconds
 agentmesh init --name my-agent --sponsor alice@company.com
 
-# Register with the mesh
-agentmesh register
+# Enter the generated project
+cd my-agent
 
-# Start with governance enabled
-agentmesh run
+# Run the generated governance smoke test
+python src/main.py
 ```
 
 ### Option 3: Wrap Any MCP Server
@@ -632,7 +632,7 @@ See our [full roadmap](docs/roadmap.md) for details.
 | Service wrapper for audit | `services/audit/` | Core audit module (`governance/audit.py`) is complete; service layer wrapper is a TODO |
 | Service wrapper for reward engine | `services/reward_engine/` | Core reward engine (`reward/engine.py`) is complete; service layer wrapper is a TODO |
 | Mesh control plane | `services/mesh-control-plane/` | Placeholder directory; no implementation yet |
-| Scope chain cryptographic verification | `packages/langchain-agentmesh/trust.py` | Simulated verification; full cryptographic chain validation not yet implemented |
+| Scope chain cryptographic verification | `agent-governance-python/agentmesh-integrations/langchain-agentmesh/trust.py` | Simulated verification; full cryptographic chain validation not yet implemented |
 
 ### Integration Caveats (Dify)
 
@@ -680,7 +680,7 @@ Yes. AgentMesh provides automated compliance mapping for EU AI Act, SOC 2, HIPAA
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
 
 ## License
 

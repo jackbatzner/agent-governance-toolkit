@@ -1,8 +1,8 @@
 version: 2
 updates:
-  # Python packages
+  # Python packages — one entry per package under agent-governance-python/.
   - package-ecosystem: "pip"
-    directory: "/packages/agent-os"
+    directory: "/agent-governance-python/agent-os"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -10,7 +10,7 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "pip"
-    directory: "/packages/agent-mesh"
+    directory: "/agent-governance-python/agent-mesh"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -18,7 +18,7 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "pip"
-    directory: "/packages/agent-hypervisor"
+    directory: "/agent-governance-python/agent-hypervisor"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -26,7 +26,7 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "pip"
-    directory: "/packages/agent-sre"
+    directory: "/agent-governance-python/agent-sre"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -34,7 +34,71 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "pip"
-    directory: "/packages/agent-compliance"
+    directory: "/agent-governance-python/agent-compliance"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-discovery"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-lightning"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-marketplace"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-mcp-governance"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-primitives"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-rag-governance"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-runtime"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/agent-governance-python/agent-sandbox"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -43,7 +107,7 @@ updates:
 
   # npm packages
   - package-ecosystem: "npm"
-    directory: "/packages/agent-os/extensions/mcp-server"
+    directory: "/agent-governance-python/agent-os/extensions/mcp-server"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -51,7 +115,23 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "npm"
-    directory: "/packages/agent-os/extensions/copilot"
+    directory: "/agent-governance-python/agent-os/extensions/copilot"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/agent-governance-copilot-cli"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/agent-governance-claude-code"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -103,7 +183,7 @@ updates:
 
   # Docker
   - package-ecosystem: "docker"
-    directory: "/packages/agent-os"
+    directory: "/agent-governance-python/agent-os"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3

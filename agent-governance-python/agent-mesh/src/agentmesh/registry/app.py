@@ -1,0 +1,429 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+"""AgentMesh Registry — FastAPI application.
+
+Spec: docs/specs/AGENTMESH-WIRE-1.0.md Section 11
+Independent design: implements against wire spec only.
+"""
+
+from __future__ import annotations
+
+import base64
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from fastapi import FastAPI, Header, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from agentmesh.registry.store import AgentRecord, InMemoryRegistryStore, RegistryStore
+
+logger = logging.getLogger(__name__)
+
+REPLAY_WINDOW = timedelta(minutes=5)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# ── Request/Response Models ──────────────────────────────────────────
+
+
+class RegisterAgentRequest(BaseModel):
+    public_key: str  # base64url, Ed25519 (32 bytes)
+    proof: str  # base64url Ed25519 signature over (public_key || proof_timestamp)
+    proof_timestamp: str  # ISO 8601 UTC timestamp signed in the proof
+    capabilities: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class PreKeyBundleRequest(BaseModel):
+    identity_key: str  # base64url, X25519 (32 bytes)
+    # Ed25519 signing key (32 bytes, base64url). Required to verify the
+    # signed_pre_key signature on the receiver side. Optional for
+    # back-compat with older clients that conflated the two keys.
+    identity_key_ed: str | None = None
+    signed_pre_key: dict[str, Any]
+    one_time_pre_keys: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ReputationRequest(BaseModel):
+    score: float = Field(ge=0.0, le=1.0)
+    reason: str = ""
+
+
+class SessionReputationRequest(BaseModel):
+    """Best-effort end-of-session telemetry from initiator/receiver.
+
+    The router-side `/agt/registry/registry/reputation/session` path lands
+    here (router strips `/agt/registry/` then prepends `/v1/`). Used by
+    AzureClaw to score session outcomes after `mesh_send` round-trips.
+    """
+
+    session_id: str
+    initiator_amid: str
+    receiver_amid: str
+    intent: str = ""
+    outcome: str  # "success" | "failed" | "timeout"
+    started_at: str = ""
+    reporter_amid: str
+    timestamp: str = ""
+    signature: str = ""
+
+
+# ── Auth ─────────────────────────────────────────────────────────────
+
+
+def verify_ed25519_timestamp_auth(
+    authorization: str | None,
+    store: RegistryStore,
+) -> str:
+    """Verify Ed25519-Timestamp auth header. Returns the agent DID.
+
+    Format: Ed25519-Timestamp <did> <iso8601> <base64url(signature)>
+
+    Spec: docs/specs/AGENTMESH-WIRE-1.0.md Section 13.1
+    """
+    if not authorization or not authorization.startswith("Ed25519-Timestamp "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    parts = authorization.split(" ", 3)
+    if len(parts) != 4:
+        raise HTTPException(status_code=401, detail="Malformed Ed25519-Timestamp header")
+
+    _, did, timestamp_str, sig_b64 = parts
+
+    # Check timestamp within replay window
+    try:
+        ts = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid timestamp format")
+
+    now = _utcnow()
+    if abs((now - ts).total_seconds()) > REPLAY_WINDOW.total_seconds():
+        raise HTTPException(status_code=401, detail="Timestamp outside replay window")
+
+    # Look up agent
+    agent = store.get_agent(did)
+    if not agent:
+        raise HTTPException(status_code=401, detail="Agent not registered")
+
+    # Verify Ed25519 signature over timestamp
+    try:
+        from nacl.signing import VerifyKey
+
+        sig = base64.urlsafe_b64decode(sig_b64 + "==")
+        vk = VerifyKey(agent.public_key)
+        vk.verify(timestamp_str.encode("utf-8"), sig)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    return did
+
+
+# ── Application ──────────────────────────────────────────────────────
+
+
+class RegistryServer:
+    """AgentMesh Registry — FastAPI application."""
+
+    def __init__(self, store: RegistryStore | None = None) -> None:
+        self._store = store or InMemoryRegistryStore()
+        self._app = self._create_app()
+
+    @property
+    def app(self) -> FastAPI:
+        return self._app
+
+    @property
+    def store(self) -> RegistryStore:
+        return self._store
+
+    def _create_app(self) -> FastAPI:
+        app = FastAPI(
+            title="AgentMesh Registry",
+            version="1.0.0",
+            description="Agent registration, pre-key distribution, and discovery.",
+        )
+
+        store = self._store
+
+        # ── Registration ─────────────────────────────────────────
+
+        @app.post("/v1/agents", status_code=201)
+        async def register_agent(req: RegisterAgentRequest) -> dict:
+            """Register a new agent with proof-of-possession."""
+            import hashlib
+
+            from nacl.exceptions import BadSignatureError
+            from nacl.signing import VerifyKey
+
+            # Decode and validate public key
+            try:
+                public_key = base64.urlsafe_b64decode(req.public_key + "==")
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid public_key encoding")
+            if len(public_key) != 32:
+                raise HTTPException(status_code=400, detail="public_key must be 32 bytes")
+
+            # Verify proof timestamp is within replay window
+            try:
+                ts = datetime.fromisoformat(req.proof_timestamp)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="Invalid proof_timestamp")
+            if abs((_utcnow() - ts).total_seconds()) > REPLAY_WINDOW.total_seconds():
+                raise HTTPException(status_code=401, detail="Proof timestamp outside replay window")
+
+            # Verify proof-of-possession: signature over (public_key || proof_timestamp)
+            try:
+                proof_bytes = base64.urlsafe_b64decode(req.proof + "==")
+                message = req.public_key.encode() + req.proof_timestamp.encode()
+                VerifyKey(public_key).verify(message, proof_bytes)
+            except BadSignatureError:
+                raise HTTPException(status_code=401, detail="Invalid proof-of-possession")
+            except Exception:
+                raise HTTPException(status_code=400, detail="Malformed proof")
+
+            # Derive DID deterministically from public key hash
+            key_hash = hashlib.sha256(public_key).hexdigest()[:32]
+            did = f"did:mesh:{key_hash}"
+
+            if store.get_agent(did):
+                raise HTTPException(status_code=409, detail="Agent already registered")
+
+            record = AgentRecord(
+                did=did,
+                public_key=public_key,
+                capabilities=req.capabilities,
+                metadata=req.metadata,
+            )
+            store.put_agent(record)
+            logger.info("Registered agent %s", did)
+            return {"did": did, "status": "registered"}
+
+        @app.get("/v1/agents/{did}")
+        async def get_agent(did: str) -> dict:
+            """Get agent metadata."""
+            agent = store.get_agent(did)
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+            return {
+                "did": agent.did,
+                "capabilities": agent.capabilities,
+                "metadata": agent.metadata,
+                "registered_at": agent.registered_at.isoformat(),
+                "last_seen": agent.last_seen.isoformat(),
+                "reputation_score": agent.reputation_score,
+            }
+
+        @app.delete("/v1/agents/{did}", status_code=204)
+        async def deregister_agent(did: str) -> None:
+            """Deregister an agent."""
+            if not store.delete_agent(did):
+                raise HTTPException(status_code=404, detail="Agent not found")
+            logger.info("Deregistered agent %s", did)
+
+        # ── Pre-Keys ─────────────────────────────────────────────
+
+        @app.put("/v1/agents/{did}/prekeys")
+        async def upload_prekeys(
+            did: str,
+            req: PreKeyBundleRequest,
+            authorization: str = Header(..., alias="Authorization"),
+        ) -> dict:
+            """Upload a pre-key bundle. Requires Ed25519-Timestamp auth."""
+            agent = store.get_agent(did)
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+
+            # Verify the caller owns this DID via Ed25519-Timestamp auth
+            authed_did = verify_ed25519_timestamp_auth(authorization, store)
+            if authed_did != did:
+                raise HTTPException(status_code=403, detail="DID mismatch")
+
+            try:
+                agent.identity_key = base64.urlsafe_b64decode(req.identity_key + "==")
+                if req.identity_key_ed:
+                    agent.identity_key_ed = base64.urlsafe_b64decode(req.identity_key_ed + "==")
+                    if len(agent.identity_key_ed) != 32:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="identity_key_ed must be exactly 32 bytes (Ed25519 public key)",
+                        )
+                spk = req.signed_pre_key
+                agent.signed_pre_key = base64.urlsafe_b64decode(spk["public_key"] + "==")
+                agent.signed_pre_key_signature = base64.urlsafe_b64decode(spk["signature"] + "==")
+                agent.signed_pre_key_id = spk["key_id"]
+                agent.one_time_pre_keys = list(req.one_time_pre_keys)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Invalid pre-key bundle: {e}")
+
+            store.put_agent(agent)
+            return {"did": did, "otk_count": len(agent.one_time_pre_keys)}
+
+        @app.get("/v1/agents/{did}/prekeys")
+        async def fetch_prekeys(did: str) -> dict:
+            """Fetch a pre-key bundle. Atomically consumes one OPK."""
+            agent = store.get_agent(did)
+            if not agent or not agent.signed_pre_key:
+                raise HTTPException(status_code=404, detail="Pre-key bundle not found")
+
+            otk = store.consume_one_time_key(did)
+
+            result: dict[str, Any] = {
+                "identity_key": base64.urlsafe_b64encode(agent.identity_key or b"").decode().rstrip("="),
+                "identity_key_ed": (
+                    base64.urlsafe_b64encode(agent.identity_key_ed).decode().rstrip("=")
+                    if agent.identity_key_ed
+                    else None
+                ),
+                "signed_pre_key": {
+                    "key_id": agent.signed_pre_key_id,
+                    "public_key": base64.urlsafe_b64encode(agent.signed_pre_key).decode().rstrip("="),
+                    "signature": base64.urlsafe_b64encode(
+                        agent.signed_pre_key_signature or b""
+                    ).decode().rstrip("="),
+                },
+            }
+
+            if otk:
+                result["one_time_pre_key"] = otk
+            else:
+                result["one_time_pre_key"] = None
+
+            return result
+
+        # ── Presence ─────────────────────────────────────────────
+
+        @app.get("/v1/agents/{did}/presence")
+        async def get_presence(did: str) -> dict:
+            """Get agent presence / last-seen."""
+            agent = store.get_agent(did)
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+            return {
+                "did": agent.did,
+                "last_seen": agent.last_seen.isoformat(),
+                "online": (_utcnow() - agent.last_seen).total_seconds() < 90,
+            }
+
+        @app.post("/v1/agents/{did}/heartbeat")
+        async def heartbeat(did: str) -> dict:
+            """Bump an agent's `last_seen` to keep it visible in presence
+            checks. Rate-limited to at most once per 10 seconds per agent
+            to prevent abuse (attacker keeping stale agents permanently
+            online). Returns 429 when throttled without updating last_seen.
+            """
+            if not store.get_agent(did):
+                raise HTTPException(status_code=404, detail="Agent not found")
+            if not store.try_update_last_seen(did, min_interval_seconds=10.0):
+                raise HTTPException(
+                    status_code=429,
+                    detail="Heartbeat throttled; retry after 10s",
+                )
+            agent = store.get_agent(did)
+            return {
+                "did": did,
+                "last_seen": agent.last_seen.isoformat() if agent else None,
+            }
+
+        # ── Reputation ───────────────────────────────────────────
+
+        @app.post("/v1/agents/{did}/reputation")
+        async def submit_reputation(did: str, req: ReputationRequest) -> dict:
+            """Submit reputation feedback for an agent."""
+            agent = store.get_agent(did)
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+
+            # Simple exponential moving average
+            alpha = 0.3
+            agent.reputation_score = alpha * req.score + (1 - alpha) * agent.reputation_score
+            store.put_agent(agent)
+            return {"did": did, "reputation_score": round(agent.reputation_score, 4)}
+
+        @app.post("/v1/registry/reputation/session")
+        async def submit_session_reputation(req: SessionReputationRequest) -> dict:
+            """Record a session outcome and update both endpoints' reputation.
+
+            Outcome mapping (EMA, alpha=0.2):
+              - success → score 1.0 toward both endpoints
+              - failed  → score 0.0 toward the receiver (initiator unchanged)
+              - timeout → score 0.2 toward the receiver (initiator unchanged)
+
+            Missing agents are silently skipped (best-effort telemetry).
+            The reporter must be a registered agent (either initiator or receiver).
+            """
+            # Validate reporter is a session participant
+            if req.reporter_amid not in (req.initiator_amid, req.receiver_amid):
+                raise HTTPException(
+                    status_code=403,
+                    detail="reporter_amid must be a session participant",
+                )
+            reporter = store.get_agent(req.reporter_amid)
+            if not reporter:
+                raise HTTPException(
+                    status_code=403,
+                    detail="reporter_amid is not a registered agent",
+                )
+            outcome = (req.outcome or "").lower()
+            alpha = 0.2
+            updated: dict[str, float] = {}
+
+            def _apply(did: str, target_score: float) -> None:
+                agent = store.get_agent(did)
+                if not agent:
+                    return
+                agent.reputation_score = alpha * target_score + (1 - alpha) * agent.reputation_score
+                store.put_agent(agent)
+                updated[did] = round(agent.reputation_score, 4)
+
+            if outcome == "success":
+                _apply(req.receiver_amid, 1.0)
+                _apply(req.initiator_amid, 1.0)
+            elif outcome == "failed":
+                _apply(req.receiver_amid, 0.0)
+            elif outcome == "timeout":
+                _apply(req.receiver_amid, 0.2)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid outcome '{req.outcome}' (expected success|failed|timeout)",
+                )
+
+            return {
+                "session_id": req.session_id,
+                "outcome": outcome,
+                "reputation": updated,
+            }
+
+        # ── Discovery ────────────────────────────────────────────
+
+        @app.get("/v1/discover")
+        async def discover(
+            capability: str = Query(..., description="Capability to search for"),
+            limit: int = Query(default=50, ge=1, le=200),
+        ) -> dict:
+            """Search agents by capability."""
+            results = store.search_by_capability(capability, limit)
+            return {
+                "results": [
+                    {
+                        "did": a.did,
+                        "capabilities": a.capabilities,
+                        "reputation_score": a.reputation_score,
+                        "last_seen": a.last_seen.isoformat(),
+                    }
+                    for a in results
+                ],
+                "total": len(results),
+            }
+
+        # ── Health ───────────────────────────────────────────────
+
+        @app.get("/health")
+        async def health() -> dict:
+            return {"status": "healthy", "service": "agentmesh-registry"}
+
+        return app

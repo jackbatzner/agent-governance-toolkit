@@ -13,7 +13,7 @@ integrating everything into CI/CD pipelines.
 
 ---
 
-## What you'll learn
+## What You'll Learn
 
 | Section | Topic |
 |---------|-------|
@@ -167,7 +167,7 @@ binaries, SBOMs, policy files, or audit logs.
 ### §3.1 Signing with the TypeScript package
 
 ```typescript
-import { AgentIdentity } from '@microsoft/agentmesh-sdk';
+import { AgentIdentity } from '@microsoft/agent-governance-sdk';
 import { readFileSync, writeFileSync } from 'fs';
 
 // 1. Generate (or load) a signing identity
@@ -277,7 +277,7 @@ func main() {
 ### §4.1 Verification with the TypeScript package
 
 ```typescript
-import { AgentIdentity } from '@microsoft/agentmesh-sdk';
+import { AgentIdentity } from '@microsoft/agent-governance-sdk';
 import { readFileSync } from 'fs';
 
 // 1. Load the signer's public identity
@@ -411,7 +411,7 @@ Add a verification step to your deployment pipeline:
 - name: Verify artifact signature
   run: |
     node -e "
-      const { AgentIdentity } = require('@microsoft/agentmesh-sdk');
+      const { AgentIdentity } = require('@microsoft/agent-governance-sdk');
       const fs = require('fs');
       const signer = AgentIdentity.fromJSON(
         JSON.parse(fs.readFileSync('signing-identity.json', 'utf-8'))
@@ -477,6 +477,7 @@ gh attestation verify dist/artifact.whl \
 | Compliance verification | [Tutorial 18 — Compliance Verification](./18-compliance-verification.md) |
 | Plugin marketplace signing | [Tutorial 10 — Plugin Marketplace](./10-plugin-marketplace.md) |
 | Ed25519 identity | [Tutorial 02 — Trust & Identity](./02-trust-and-identity.md) |
+| Shift-left governance | [Tutorial 45 — Shift-Left Governance](./45-shift-left-governance.md) |
 
 ---
 
@@ -484,7 +485,7 @@ gh attestation verify dist/artifact.whl \
 
 | Component | Location |
 |-----------|----------|
-| Security scanner | `packages/agent-compliance/src/agent_compliance/security/scanner.py` |
+| Security scanner | `agent-governance-python/agent-compliance/src/agent_compliance/security/scanner.py` |
 | SBOM workflow | `.github/workflows/sbom.yml` |
 | Publish workflow | `.github/workflows/publish.yml` |
 | Ed25519 identity (TS) | `agent-governance-typescript/src/identity.ts` |

@@ -1,5 +1,106 @@
 # Copilot Instructions for agent-governance-toolkit
 
+## Architecture
+
+Multi-language monorepo for runtime governance of AI agents. Core is Python, with SDKs in TypeScript, Rust, .NET, and Go.
+
+**Core Python packages** live under `packages/`:
+
+| Package | Purpose |
+|---------|---------|
+| `agent-compliance` (`agent_governance_toolkit`) | Unified installer, `agt` CLI, runtime policy enforcement |
+| `agent-os` (`agent_os_kernel`) | Kernel: policy evaluator, identity, trust, audit |
+| `agent-mesh` (`agentmesh_platform`) | Multi-agent networking: Wire Protocol, registry, relay, E2E encryption |
+| `agent-hypervisor` | Execution sandboxing and resource isolation |
+| `agent-sre` | SRE: health checks, circuit breakers, observability |
+| `agent-runtime` | Runtime orchestration layer |
+| `agent-mcp-governance` | MCP (Model Context Protocol) governance primitives |
+| `agent-discovery` | Agent discovery and capability advertisement |
+| `agent-lightning` | Lightweight/fast-path policy evaluation |
+| `agent-marketplace` | Agent marketplace and registry |
+| `agentmesh-integrations` | Framework adapters (LangChain, CrewAI, AutoGen, etc.) |
+
+**Language SDKs:**
+
+| Language | Path | Package name |
+|----------|------|--------------|
+| TypeScript | `packages/agent-mesh/sdks/typescript/` | `@microsoft/agent-governance-sdk` |
+| Rust | `packages/agent-mesh/sdks/rust/` | `agent-governance`, `agent-governance-mcp` |
+| .NET | `agent-governance-dotnet/` | `Microsoft.AgentGovernance` |
+| Go | `agent-governance-golang/` | (standalone top-level) |
+
+**Other top-level directories:** `docs/` (MkDocs site), `examples/` (runnable integrations), `demo/` (live dashboards), `pipelines/` (ESRP release automation), `benchmarks/`, `fuzz/` (ClusterFuzzLite), `notebooks/`.
+
+Each subdirectory with an `AGENTS.md` has area-specific commands and boundaries: read it before changing code there.
+
+## Build, Test, and Lint
+
+### Python
+
+```bash
+# Install (editable, all extras)
+pip install -e ".[full]"
+
+# Lint
+ruff check --select E,F,W --ignore E501
+
+# Test (full suite)
+pytest
+
+# Test (single file)
+pytest tests/test_policy.py
+
+# Test (single test by name)
+pytest -k "test_policy_deny_dangerous_tools"
+
+# Build
+python -m build
+```
+
+### TypeScript (`packages/agent-mesh/sdks/typescript/`)
+
+```bash
+npm run build
+npm test           # runs jest
+npm run lint
+```
+
+### Rust (`packages/agent-mesh/sdks/rust/`)
+
+```bash
+cargo build --release --workspace
+cargo test --release --workspace
+
+# Single test
+cargo test --release test_name
+```
+
+### .NET (`agent-governance-dotnet/`)
+
+```bash
+dotnet build AgentGovernance.sln
+dotnet test AgentGovernance.sln
+
+# Single test
+dotnet test --filter "FullyQualifiedName~TestClassName.TestMethodName"
+```
+
+### MCP Server (`packages/agent-os/extensions/mcp-server/`)
+
+```bash
+npm run build
+npm test           # runs vitest
+npm run test:coverage
+```
+
+### Docs (`docs/`)
+
+```bash
+pip install -r requirements/docs.txt
+mkdocs serve       # local preview
+mkdocs build       # build static site
+```
+
 ## Decision Escalation
 
 For major design changes, always ask the maintainer (@imran-siddique) before proceeding:
@@ -11,6 +112,46 @@ For major design changes, always ask the maintainer (@imran-siddique) before pro
 - Changes to CI/CD pipeline architecture
 
 Do NOT auto-merge large feature PRs without maintainer review.
+
+## PR Description Standards
+
+Every PR must have a well-structured, properly formatted description. Lightweight or mangled descriptions are not acceptable.
+
+### Required sections
+
+1. **Summary** (1-2 sentences): What this PR does and why.
+2. **Problem** (optional for trivial fixes): What was broken, missing, or suboptimal.
+3. **Changes**: A table or bullet list of files changed and what changed in each. Use a markdown table for 3+ files.
+4. **Testing**: How the changes were verified (test results, manual validation, docs-only note).
+
+### Formatting rules
+
+- Use proper markdown: headings (`##`), backtick code spans, tables, blank lines between sections.
+- Never pass PR body text through PowerShell inline strings. Always write the body to a temp file with Python (to preserve backticks and special characters) and use `gh pr create --body-file`.
+- Verify the rendered PR description on GitHub after creation. If formatting is broken, fix it immediately with `gh pr edit --body-file`.
+- No escaped backslashes where backticks should be. No missing blank lines between paragraphs. No corrupted characters.
+
+### Template
+
+```markdown
+## Summary
+
+<What and why, 1-2 sentences.>
+
+## Problem
+
+<What was broken or missing. Skip for trivial changes.>
+
+## Changes
+
+| File | What changed |
+|------|-------------|
+| `path/to/file.py` | Description of change |
+
+## Testing
+
+<How verified: "All N tests pass", "Docs-only, verified links", etc.>
+```
 
 ## External Contribution Quality Gate
 
@@ -47,16 +188,57 @@ When merging PRs, follow this sequence for EACH PR (do not batch):
 
 This prevents PRs from stacking in the merge queue behind stale branches.
 
+## PR Comment Etiquette — Read Before Writing
+
+Before commenting on ANY PR or pinging a reviewer:
+
+1. **Read ALL existing comments and review threads first** — never post feedback that duplicates, contradicts, or ignores prior discussion
+2. **Check resolved threads** — don't re-raise issues that were already addressed
+3. **Review the full conversation timeline** — understand what was already requested, what was fixed, and what decisions were made before adding your input
+4. **Don't ping reviewers until you've verified** there are no unaddressed comments from previous rounds that you should handle first
+
+Ignoring existing PR context wastes reviewer time and erodes trust.
+
 ## PR Review — Mandatory Before Merge
 
 NEVER merge a PR without thorough code review. CI passing is NOT sufficient.
+
+### Review Output Style
+
+All PR reviews (human and bot) MUST follow this concise format. Verbose essay-style reviews waste contributor time.
+
+```
+**TL;DR**: N blockers, M warnings. Fix #1 and #2 and this ships.
+
+| # | Sev | Issue | Where |
+|---|-----|-------|-------|
+| 1 | Block | One-line description | function/file |
+| 2 | Warn | One-line description | function/file |
+
+**#1**: One sentence explaining what to fix.
+**#2**: One sentence explaining what to fix.
+
+Warnings are fine as follow-up PRs.
+```
+
+Rules:
+- Lead with verdict, not analysis. TL;DR line is mandatory.
+- Summary table: one row per finding, one-line descriptions only.
+- Action items: only for blockers. One sentence each, no code blocks.
+- Warnings: list in table, mark as "fine as follow-ups."
+- Nits: do NOT include in posted reviews. Drop entirely on external contributor PRs.
+- No multi-paragraph explanations, "Conclusion" sections, or suggestion lists.
+- No inline code suggestions in the summary. Trust the contributor.
+- 200 words max per review. If no issues: "No issues found. Clean change."
+
+### Review Checklist
 
 Before approving or merging ANY PR, verify ALL of the following:
 
 1. **Read the actual diff** — don't rely on PR description alone
 2. **Attribution & prior art** — check if the PR implements patterns similar to known open-source projects. If it does, verify proper attribution exists in the PR description and code. Check whether the PR arrived shortly after a community member proposed similar work in an issue — if so, verify the contributor isn't submitting an uncredited derivative. **PRs without proper attribution will not be merged.**
 3. **Dependency confusion scan** — check every `pip install`, `npm install`, `cargo add` command in docs/code for unregistered package names. The registered names are:
-   - **PyPI:** `agent-os-kernel`, `agentmesh-platform`, `agent-hypervisor`, `agentmesh-runtime`, `agent-sre`, `agent-governance-toolkit`, `agentmesh-lightning`, `agentmesh-marketplace`
+   - **PyPI:** `agent-os-kernel`, `agentmesh-platform`, `agent-hypervisor`, `agentmesh-runtime`, `agent-sre`, `agent-governance-toolkit`, `agentmesh-lightning`, `agentmesh-marketplace`, `agt-sandbox`
    - **PyPI (local-only, not published):** `agent-governance-dotnet`, `agentmesh-integrations`, `agent-primitives`, `emk`
    - **PyPI (common deps):** `streamlit`, `plotly`, `pandas`, `networkx`, `aioredis`, `pypdf`, `spacy`, `slack-sdk`, `docker`, `langchain-openai`
    - **npm:** `@microsoft/agent-os-kernel`
@@ -110,8 +292,9 @@ saves time.
   ```
 
 **Python Code Quality (CodeQL):**
-- Never use `timedelta(days=365)` to represent "one year" — use `timedelta(days=366)`
-  or `dateutil.relativedelta(years=1)` for leap-year safety
+- Never use `timedelta(days=365)` or `timedelta(days=366)` to represent "one year" in
+  production code. Use `dateutil.relativedelta(years=1)` for leap-year safety. In tests
+  where approximate durations suffice, use `timedelta(days=400)` to avoid CodeQL flags.
 - Never use `is True` / `is False` for boolean comparison — use `== True` / `== False`
   (or just `if value:` / `if not value:`)
 - Never use mutable default arguments (`def f(x=[])`) — use `None` with body initialization:
@@ -170,11 +353,11 @@ saves time.
 ## CI Optimization
 
 CI workflows use path filters so only relevant checks run per PR:
-- **Python changes** (`packages/agent-mesh/`, `packages/agent-os/`, etc.) → lint + test for that package only
+- **Python changes** (`agent-governance-python/agent-mesh/`, `agent-governance-python/agent-os/`, etc.) → lint + test for that package only
 - **TypeScript changes** (`agent-governance-typescript/`, `extensions/copilot/`) → TS lint + test only`n- **Rust changes** (`agent-governance-rust/`) → cargo test only
 - **.NET changes** (`agent-governance-dotnet/`) → dotnet test only
 - **Go changes** (`agent-governance-golang/`) → go test only
-- **Docs-only changes** (`.md`, `notebooks/`) → link check only, skip all builds/tests
+- **Docs-only changes** (`.md`, `agent-governance-python/notebooks/`) → link check only, skip all builds/tests
 - **Workflow changes** (`.github/workflows/`) → workflow-security audit only
 
 ## Publishing
@@ -213,3 +396,9 @@ After merging ANY external contributor PR, perform these follow-up checks and fi
 16. **Run CI** — confirm the CI run on the merge commit passes. If it fails, fix immediately.
 17. **Lint compliance** — new Python files must pass `ruff check --select E,F,W --ignore E501`.
 18. **Test compatibility** — if our fixes changed data types (e.g., list → tuple), update any tests that assert on the old type.
+
+## Implementation Quality
+
+- **No mocks or stubs in production code.** Always provide real, working implementations. If a dependency is unavailable, build the real integration or defer the feature — never ship a mock.
+- **No TODO/FIXME/HACK comments as placeholders.** If something needs to be done, do it now or track it as a GitHub issue. Code with TODO comments will not be merged.
+- **No placeholder or skeleton implementations.** Every function, class, and module must be fully implemented and tested. Empty methods, `pass` bodies, `raise NotImplementedError`, or `// TODO` stubs are not acceptable.

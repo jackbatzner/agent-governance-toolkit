@@ -4,6 +4,7 @@
 package agentmesh
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -45,6 +46,7 @@ type PolicyEngine struct {
 	mu         sync.RWMutex
 	rules      []PolicyRule
 	rateLimits map[string]*rateLimitState
+	backends   []ExternalPolicyBackend
 }
 
 // NewPolicyEngine creates a PolicyEngine with the supplied rules.
@@ -52,32 +54,114 @@ func NewPolicyEngine(rules []PolicyRule) *PolicyEngine {
 	return &PolicyEngine{
 		rules:      rules,
 		rateLimits: make(map[string]*rateLimitState),
+		backends:   make([]ExternalPolicyBackend, 0),
 	}
+}
+
+// AddBackend registers an external policy backend consulted when no native rule matches.
+func (pe *PolicyEngine) AddBackend(backend ExternalPolicyBackend) {
+	if backend == nil {
+		return
+	}
+
+	pe.mu.Lock()
+	defer pe.mu.Unlock()
+	pe.backends = append(pe.backends, backend)
+}
+
+// LoadRego registers an OPA/Rego backend with the policy engine.
+func (pe *PolicyEngine) LoadRego(options OPAOptions) {
+	pe.AddBackend(NewOPABackend(options))
+}
+
+// LoadCedar registers a Cedar backend with the policy engine.
+func (pe *PolicyEngine) LoadCedar(options CedarOptions) {
+	pe.AddBackend(NewCedarBackend(options))
 }
 
 // Evaluate returns the decision for the given action and context.
 // Rules are evaluated in order; first match wins. Default is Deny.
+//
+// Concurrency: the rule scan runs under RLock so concurrent evaluations
+// don't serialize. Only checkRateLimit acquires the write lock.
 func (pe *PolicyEngine) Evaluate(action string, context map[string]interface{}) PolicyDecision {
-	pe.mu.Lock()
-	defer pe.mu.Unlock()
+	pe.mu.RLock()
 
-	for _, rule := range pe.rules {
-		if matchAction(rule.Action, action) && matchConditions(rule.Conditions, context) {
-			if rule.MaxCalls > 0 {
-				return pe.checkRateLimit(rule)
-			}
-			if rule.MinApprovals > 0 {
-				return RequiresApproval
-			}
-			return rule.Effect
+	var matched *PolicyRule
+	for i := range pe.rules {
+		r := &pe.rules[i]
+		if matchAction(r.Action, action) && matchConditions(r.Conditions, context) {
+			matched = r
+			break
 		}
 	}
-	return Deny
+	backends := append([]ExternalPolicyBackend(nil), pe.backends...)
+	pe.mu.RUnlock()
+
+	if matched != nil {
+		if matched.MaxCalls > 0 {
+			return pe.checkRateLimit(*matched, context)
+		}
+		if matched.MinApprovals > 0 {
+			return RequiresApproval
+		}
+		return matched.Effect
+	}
+
+	backendContext := clonePolicyContext(context)
+	if _, ok := backendContext["action"]; !ok {
+		backendContext["action"] = action
+	}
+	if _, ok := backendContext["tool_name"]; !ok {
+		backendContext["tool_name"] = action
+	}
+
+	if len(backends) == 0 {
+		return Deny
+	}
+
+	for _, backend := range backends {
+		result, err := backend.Evaluate(backendContext)
+		if err != nil {
+			return Deny
+		}
+		decision := normalizeBackendDecision(result)
+		if decision != Allow {
+			return decision
+		}
+	}
+
+	return Allow
+}
+
+// rateLimitContextString returns a stable string representation of a
+// context value for use in the rate-limit composite key. Non-string
+// values fall through to fmt.Sprint to handle the common case where
+// an upstream caller plumbs int agent IDs or similar.
+func rateLimitContextString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprint(v)
 }
 
 // checkRateLimit tracks and enforces per-rule call limits within a time window.
-func (pe *PolicyEngine) checkRateLimit(rule PolicyRule) PolicyDecision {
-	key := rule.Action
+// The window state is keyed by (rule action, agent_id, tenant) so a single
+// noisy caller does not exhaust the budget for all other agents or tenants.
+// Missing context keys collapse to an empty segment — callers that don't
+// supply agent_id / tenant retain the previous globally-scoped behavior.
+//
+// Acquires the write lock internally; callers must NOT hold any lock.
+func (pe *PolicyEngine) checkRateLimit(rule PolicyRule, context map[string]interface{}) PolicyDecision {
+	pe.mu.Lock()
+	defer pe.mu.Unlock()
+
+	agentID := rateLimitContextString(context["agent_id"])
+	tenant := rateLimitContextString(context["tenant"])
+	key := rule.Action + "\x1f" + agentID + "\x1f" + tenant
 	now := time.Now()
 
 	window, err := time.ParseDuration(rule.Window)
@@ -97,31 +181,61 @@ func (pe *PolicyEngine) checkRateLimit(rule PolicyRule) PolicyDecision {
 		return Allow
 	}
 
-	state.count++
-	if state.count > rule.MaxCalls {
+	// Check BEFORE incrementing so the counter never grows past MaxCalls.
+	if state.count >= rule.MaxCalls {
 		return RateLimit
 	}
+	state.count++
 	return Allow
 }
 
-// LoadFromYAML loads rules from a YAML file, appending to existing rules.
+// LoadFromYAML replaces the engine's rule set with the rules from a YAML
+// file. Existing rules are discarded on success; on parse or I/O error the
+// previous rule set is left intact. This matches the natural semantics of a
+// "load" verb and prevents the rule set from doubling when the same file is
+// re-read (e.g. on config reload).
+//
+// To extend the rule set without replacing it, use MergeFromYAML.
 func (pe *PolicyEngine) LoadFromYAML(path string) error {
-	data, err := os.ReadFile(path)
+	rules, err := readPolicyRulesFromYAML(path)
 	if err != nil {
 		return err
+	}
+
+	pe.mu.Lock()
+	defer pe.mu.Unlock()
+	pe.rules = rules
+	return nil
+}
+
+// MergeFromYAML appends rules from a YAML file to the engine's existing rule
+// set. Use this when composing rules from multiple files; use LoadFromYAML
+// when reloading a single canonical rule set.
+func (pe *PolicyEngine) MergeFromYAML(path string) error {
+	rules, err := readPolicyRulesFromYAML(path)
+	if err != nil {
+		return err
+	}
+
+	pe.mu.Lock()
+	defer pe.mu.Unlock()
+	pe.rules = append(pe.rules, rules...)
+	return nil
+}
+
+func readPolicyRulesFromYAML(path string) ([]PolicyRule, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
 	}
 
 	var loaded struct {
 		Rules []PolicyRule `yaml:"rules"`
 	}
 	if err := yaml.Unmarshal(data, &loaded); err != nil {
-		return err
+		return nil, err
 	}
-
-	pe.mu.Lock()
-	defer pe.mu.Unlock()
-	pe.rules = append(pe.rules, loaded.Rules...)
-	return nil
+	return loaded.Rules, nil
 }
 
 func matchAction(pattern, action string) bool {
@@ -284,4 +398,26 @@ func valuesEqual(a, b interface{}) bool {
 	default:
 		return false
 	}
+}
+
+func clonePolicyContext(context map[string]interface{}) map[string]interface{} {
+	if context == nil {
+		return make(map[string]interface{})
+	}
+
+	cloned := make(map[string]interface{}, len(context))
+	for key, value := range context {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func normalizeBackendDecision(result BackendDecision) PolicyDecision {
+	if result.Decision != "" {
+		return result.Decision
+	}
+	if result.Allowed {
+		return Allow
+	}
+	return Deny
 }

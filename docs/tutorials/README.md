@@ -47,6 +47,7 @@ guides.
 | 11 | [Saga Orchestration](11-saga-orchestration.md) | Multi-step transactions, DSL, fan-out, compensating actions | `agentmesh-runtime` |
 | 12 | [Liability & Attribution](12-liability-and-attribution.md) | Vouching, slashing, causal attribution, quarantine | `agentmesh-runtime` |
 | 14 | [Kill Switch & Rate Limiting](14-kill-switch-and-rate-limiting.md) | Emergency termination, rate limiting, ring elevation | `agentmesh-runtime` |
+| 51 | [Cost Governance](51-cost-governance.md) | Tiered budgets, auto-throttle, kill switch, anomaly detection, cost optimization | `agent-sre` |
 
 ## Trust & Networking
 
@@ -65,6 +66,7 @@ guides.
 | 13 | [Observability & Tracing](13-observability-and-tracing.md) | Causal traces, event bus, Prometheus, OpenTelemetry | `agentmesh-runtime` |
 | 15 | [RL Training Governance](15-rl-training-governance.md) | GovernedRunner, PolicyReward, Gym-compatible environments | `agentmesh-lightning` |
 | 18 | [Compliance Verification](18-compliance-verification.md) | Governance grading, regulatory frameworks, attestation | `agent-governance-toolkit` |
+| 50 | [Decision BOM](50-decision-bom.md) | Reconstruct full decision context from observability signals, completeness scoring, batch audit | `agentmesh-platform` |
 
 ## Multi-Language Packages
 
@@ -72,7 +74,7 @@ guides.
 |---|----------|-------------------|---------|
 | 19 | [.NET package](19-dotnet-sdk.md) | GovernanceKernel, policy, rings, saga, SLO, OpenTelemetry in C# | `Microsoft.AgentGovernance` |
 | 42 | [C# MCP extension](42-csharp-mcp-extension.md) | Add governed tool execution, startup scanning, and response sanitization to MCP servers | `Microsoft.AgentGovernance.Extensions.ModelContextProtocol` |
-| 20 | [TypeScript package](20-typescript-sdk.md) | Identity, trust, policy, audit in TypeScript/Node.js | `@microsoft/agentmesh-sdk` |
+| 20 | [TypeScript package](20-typescript-sdk.md) | Identity, trust, policy, audit in TypeScript/Node.js | `@microsoft/agent-governance-sdk` |
 | 21 | [Rust crate](21-rust-sdk.md) | Policy, trust, audit, identity with `agentmesh` crate | `agentmesh` |
 | 22 | [Go module](22-go-sdk.md) | Policy, trust, audit, identity with Go module | `agentmesh` |
 
@@ -80,8 +82,9 @@ guides.
 
 | # | Tutorial | What You'll Learn | Package |
 |---|----------|-------------------|---------|
-| 23 | [Delegation Chains](23-delegation-chains.md) | Monotonic scope narrowing, multi-agent delegation, cascade revocation | `@microsoft/agentmesh-sdk` |
+| 23 | [Delegation Chains](23-delegation-chains.md) | Monotonic scope narrowing, multi-agent delegation, cascade revocation | `@microsoft/agent-governance-sdk` |
 | 24 | [Cost & Token Budgets](24-cost-and-token-budgets.md) | Per-session token limits, context scheduling, budget signals | `agent-os-kernel` |
+| 49 | [Multi-Agent Collective Policies](49-multi-agent-policies.md) | Aggregate constraints across agents: rate limits, concurrent caps, alert-only monitoring | `agentmesh-platform` |
 
 ## Supply Chain Security
 
@@ -90,7 +93,7 @@ guides.
 | 25 | [Security Hardening](25-security-hardening.md) | Gitleaks, Dependabot, CodeQL, fuzzing, Scorecard, branch protection | `agent-governance-toolkit` |
 | 26 | [SBOM & Signing](26-sbom-and-signing.md) | SPDX/CycloneDX SBOMs, Ed25519 artifact signing, attestation | `agent-compliance` |
 | 27 | [MCP Scan CLI](27-mcp-scan-cli.md) | MCP tool scanning, rug-pull detection, CI integration | `agent-os-kernel` |
-| 33 | [Offline-Verifiable Decision Receipts](33-offline-verifiable-receipts.md) | Ed25519 + JCS receipts, hash-chained, externally verifiable per tool call | `protect-mcp` / `agent-governance-toolkit` |
+| 45 | [Shift-Left Governance](45-shift-left-governance.md) | Pre-commit hooks, GitHub Actions, CI gates, language-specific build-time enforcement | `agent-governance-toolkit` |
 
 ---
 
@@ -118,6 +121,7 @@ guides.
 | 39 | [DLP with Attribute Ratchets](39-dlp-attribute-ratchets.md) | Monotonic session state — sensitivity only goes up, never resets | `agentmesh-platform` |
 | 40 | [OTel Observability](40-otel-observability.md) | OpenTelemetry spans + metrics for policy, approval, and trust operations | `agentmesh-platform` |
 | 41 | [Advisory Defense-in-Depth](41-advisory-defense-in-depth.md) | Pattern, ML, and HTTP classifiers as non-deterministic defense layer | `agentmesh-platform` |
+| 48 | [Intent-Based Authorization](48-intent-based-authorization.md) | Declare/approve/execute/verify lifecycle, drift detection, child intent scope narrowing | `agent-os-kernel` |
 
 ## Extending the Toolkit
 
@@ -146,7 +150,7 @@ A self-contained sub-series progressing from basic allow/deny rules to productio
 
 ## Learning Paths
 
-### 🚀 "I want to govern my agent in 10 minutes"
+### 🚀 "I want to govern my agent in 5 minutes"
 
 1. [01 — Policy Engine](01-policy-engine.md) → define allow/deny rules
 2. [03 — Framework Integrations](03-framework-integrations.md) → wrap your framework
@@ -161,6 +165,7 @@ A self-contained sub-series progressing from basic allow/deny rules to productio
 5. [14 — Kill Switch & Rate Limiting](14-kill-switch-and-rate-limiting.md) → emergency controls
 6. [25 — Security Hardening](25-security-hardening.md) → CI/CD security gates
 7. [27 — MCP Scan CLI](27-mcp-scan-cli.md) → scan tool definitions for threats
+8. [45 — Shift-Left Governance](45-shift-left-governance.md) → pre-commit, PR, CI, and release gates
 
 ### 🏢 "I need enterprise compliance"
 
@@ -215,14 +220,14 @@ Install the full toolkit:
 ```bash
 pip install agent-governance-toolkit[full]    # Python
 dotnet add package Microsoft.AgentGovernance  # .NET
-npm install @microsoft/agentmesh-sdk                    # TypeScript
+npm install @microsoft/agent-governance-sdk                    # TypeScript
 cargo add agentmesh                           # Rust
 go get github.com/microsoft/agent-governance-toolkit/agent-governance-golang  # Go
 ```
 
 ## More Resources
 
-- **[Quick Start](../../QUICKSTART.md)** — Zero to governed agents in 10 minutes
+- **[Quick Start](../../quickstart.md)** — Zero to governed agents in 5 minutes
 - **[Architecture](../ARCHITECTURE.md)** — System design and security model
 - **[OWASP Compliance](../OWASP-COMPLIANCE.md)** — ASI-01 through ASI-10 mapping
 - **[Benchmarks](../../BENCHMARKS.md)** — Performance data

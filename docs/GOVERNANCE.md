@@ -25,26 +25,26 @@ for the current list.
 ### Contributors
 
 Anyone who submits a pull request, files an issue, or participates in discussions.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ### Community Extension Authors
 
-External contributors who build integrations under `packages/agentmesh-integrations/`.
+External contributors who build integrations under `agent-governance-python/agentmesh-integrations/`.
 Extensions are community-maintained and clearly separated from core.
 
 ## Core vs Community Extension Boundary
 
 | Path | Ownership | Review Policy |
 |------|-----------|--------------|
-| `packages/agent-os/` | Microsoft maintainers | Maintainer approval required |
-| `packages/agent-mesh/src/` | Microsoft maintainers | Maintainer approval required |
-| `packages/agent-hypervisor/` | Microsoft maintainers | Maintainer approval required |
-| `packages/agent-sre/` | Microsoft maintainers | Maintainer approval required |
-| `packages/agent-compliance/` | Microsoft maintainers | Maintainer approval required |
-| `packages/agent-runtime/` | Microsoft maintainers | Maintainer approval required |
-| `packages/agent-marketplace/` | Microsoft maintainers | Maintainer approval required |
+| `agent-governance-python/agent-os/` | Microsoft maintainers | Maintainer approval required |
+| `agent-governance-python/agent-mesh/src/` | Microsoft maintainers | Maintainer approval required |
+| `agent-governance-python/agent-hypervisor/` | Microsoft maintainers | Maintainer approval required |
+| `agent-governance-python/agent-sre/` | Microsoft maintainers | Maintainer approval required |
+| `agent-governance-python/agent-compliance/` | Microsoft maintainers | Maintainer approval required |
+| `agent-governance-python/agent-runtime/` | Microsoft maintainers | Maintainer approval required |
+| `agent-governance-python/agent-marketplace/` | Microsoft maintainers | Maintainer approval required |
 | `agent-governance-dotnet/` | Microsoft maintainers | Maintainer approval required |
-| `packages/agentmesh-integrations/` | Community + maintainers | Maintainer review, community may author |
+| `agent-governance-python/agentmesh-integrations/` | Community + maintainers | Maintainer review, community may author |
 | `docs/integrations/` | Community + maintainers | Maintainer review, community may author |
 | `docs/adr/` | Community + maintainers | Maintainer review for proposed ADRs |
 | `examples/` | Community + maintainers | Maintainer review |
@@ -54,7 +54,7 @@ agent-runtime, agent-marketplace, agent-governance-dotnet) are maintained exclus
 by Microsoft. External contributions to core require a prior discussion in a GitHub Issue
 and explicit maintainer approval before a PR is opened.
 
-**Community extensions** under `packages/agentmesh-integrations/` are welcome from any
+**Community extensions** under `agent-governance-python/agentmesh-integrations/` are welcome from any
 contributor. Extensions must not modify core packages. Each extension must include its
 own README, tests, and license notice.
 

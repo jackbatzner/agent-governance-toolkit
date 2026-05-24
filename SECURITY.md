@@ -13,18 +13,89 @@ please review the latest guidance for Microsoft repositories at
 
 <!-- END MICROSOFT SECURITY.MD BLOCK -->
 
+## Threat Model
+
+Agent governance tooling occupies a unique position in the security stack: it
+sits between autonomous AI agents and the resources they access. Unlike
+traditional middleware, the agents AGT governs can reason, adapt, and attempt
+to circumvent controls. This creates threat categories that do not exist in
+conventional software.
+
+**Trust boundaries:**
+
+```
+┌──────────────┐     ┌─────────────────┐     ┌──────────────────┐
+│  AI Agent    │────▶│  AGT Policy     │────▶│  Protected       │
+│  (untrusted) │     │  Engine         │     │  Resources       │
+└──────────────┘     │  (trust anchor) │     └──────────────────┘
+                     └─────────────────┘
+                           │
+                     ┌─────────────────┐
+                     │  Audit Log      │
+                     │  (tamper-proof) │
+                     └─────────────────┘
+```
+
+**Key threat categories:**
+
+| Category | Description | AGT mitigation |
+|----------|-------------|----------------|
+| Policy bypass | Agent crafts inputs that cause the policy engine to permit unauthorized actions | Deterministic evaluation with no LLM in the policy path; formal spec conformance tests |
+| Identity spoofing | Agent presents forged credentials or DIDs to impersonate a higher-trust agent | Cryptographic identity verification via AgentMesh identity layer |
+| Audit tampering | Attacker modifies or deletes audit records to hide policy violations | Append-only audit log with cryptographic chaining |
+| Budget evasion | Agent manipulates cost inputs (NaN, negative values) to bypass spending limits | Input validation rejecting IEEE 754 special values (see advisory below) |
+| Tool-call injection | Malicious MCP server returns tool results designed to manipulate agent behavior | MCP Security Gateway with allowlist/denylist enforcement |
+| Supply chain compromise | Compromised dependency introduces backdoor into policy evaluation | SLSA build provenance, dependency review, weekly security audits |
+| Privilege escalation via delegation | Agent delegates to a sub-agent that has broader permissions than the parent | Delegation chain verification with trust score attenuation |
+
+**Operator guidance:**
+
+- Run AGT's policy engine as a separate process or sidecar, not embedded in the
+  agent's own process. This prevents a compromised agent from modifying policy
+  evaluation logic.
+- Enable audit logging to an external, append-only store. Agents should not have
+  write access to their own audit logs.
+- Use the MCP Security Gateway for any agent that calls external tools. Review
+  tool server configurations before deployment.
+- Pin AGT dependency versions and verify SLSA provenance attestations.
+
 ## Security Contact
 
 To report a vulnerability, email **secure@microsoft.com**. You will receive acknowledgement
 within 24 hours and a detailed response within 72 hours indicating next steps.
 
+## Scope
+
+The following components are in scope for security reports:
+
+- **Policy engine** (agent_os): policy bypass, evaluation errors, deterministic guarantee violations
+- **Identity layer** (agentmesh): DID/key material leaks, trust score manipulation, attestation forgery
+- **Sandbox** (agent_sandbox): guest escape, host resource access, isolation boundary violations
+- **Supply chain** (CI/CD, publishing): build tampering, dependency confusion, secret exposure
+- **Compliance tooling** (agent_compliance): false negatives in security scanning
+
+Out of scope:
+- Denial of service against local CLI tools (e.g., `agt` commands)
+- Issues in third-party dependencies already tracked by Dependabot
+- Social engineering or phishing attacks against maintainers
+
+## Severity Definitions
+
+| Severity | Description | Example |
+|----------|-------------|---------|
+| Critical | Remote exploitation, data exfiltration, or complete policy bypass without authentication | Sandbox escape allowing host code execution |
+| High | Policy bypass under specific conditions, credential exposure, or trust boundary violation | Kill switch bypass via crafted IEEE 754 values |
+| Medium | Race conditions, information disclosure, or partial bypass requiring local access | Thread safety issue in concurrent policy evaluation |
+| Low | Minor information leak, hardening gap, or defense-in-depth improvement | Missing input validation on non-security path |
+
 ## Supported Versions
 
 | Version | Supported          |
 |---------|--------------------|
-| 2.1.x   | :white_check_mark: |
-| 2.0.x   | :white_check_mark: |
-| < 2.0   | :x:                |
+| 3.4.x   | :white_check_mark: |
+| 3.3.x   | :white_check_mark: |
+| 3.2.x   | :white_check_mark: |
+| < 3.2   | :x:                |
 
 ## Disclosure Policy
 

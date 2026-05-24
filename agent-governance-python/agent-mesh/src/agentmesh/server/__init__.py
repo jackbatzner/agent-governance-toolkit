@@ -1,0 +1,95 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+"""
+AgentMesh Component Servers
+
+FastAPI-based HTTP servers for the four AgentMesh components:
+- trust-engine: Agent identity verification and trust token issuance
+- policy-server: Governance policy evaluation
+- audit-collector: Append-only audit log with Merkle integrity
+- api-gateway: Reverse proxy with rate limiting
+"""
+
+from __future__ import annotations
+
+import os
+import time
+
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
+
+COMPONENT = os.getenv("AGENTMESH_COMPONENT", "unknown")
+VERSION = "0.3.0"
+_start_time: float = 0.0
+
+
+def create_base_app(component: str, description: str) -> FastAPI:
+    """Create a FastAPI app with standard health/metrics endpoints."""
+    global _start_time
+    _start_time = time.monotonic()
+
+    app = FastAPI(
+        title=f"AgentMesh {component}",
+        description=description,
+        version=VERSION,
+        docs_url="/docs",
+        redoc_url=None,
+    )
+
+    @app.get("/healthz", tags=["health"])
+    async def healthz() -> dict[str, str]:
+        return {"status": "ok", "component": component}
+
+    @app.get("/readyz", tags=["health"])
+    async def readyz() -> dict[str, str]:
+        return {"status": "ready", "component": component}
+
+    @app.get("/metrics", tags=["observability"])
+    async def metrics() -> PlainTextResponse:
+        """Prometheus exposition format metrics endpoint.
+
+        Returns all registered prometheus_client metrics plus AGT uptime.
+        Falls back to a minimal text response if prometheus_client is unavailable.
+        """
+        try:
+            from prometheus_client import generate_latest, REGISTRY
+
+            output = generate_latest(REGISTRY).decode("utf-8")
+
+            # Append uptime as a comment-style info line
+            uptime = time.monotonic() - _start_time
+            uptime_line = (
+                f"# HELP agt_uptime_seconds Component uptime in seconds\n"
+                f"# TYPE agt_uptime_seconds gauge\n"
+                f'agt_uptime_seconds{{component="{component}"}} {uptime:.2f}\n'
+            )
+            output += uptime_line
+
+            return PlainTextResponse(
+                content=output,
+                media_type="text/plain; version=0.0.4; charset=utf-8",
+            )
+        except ImportError:
+            # Fallback when prometheus_client is not installed
+            uptime = time.monotonic() - _start_time
+            fallback = (
+                f"# HELP agt_uptime_seconds Component uptime in seconds\n"
+                f"# TYPE agt_uptime_seconds gauge\n"
+                f'agt_uptime_seconds{{component="{component}"}} {uptime:.2f}\n'
+            )
+            return PlainTextResponse(
+                content=fallback,
+                media_type="text/plain; version=0.0.4; charset=utf-8",
+            )
+
+    return app
+
+
+def run_server(app: FastAPI, default_port: int) -> None:
+    """Run uvicorn with env-configurable host/port."""
+    import uvicorn
+
+    host = os.getenv("HOST", "0.0.0.0")  # noqa: S104 — intentional: server bind-all for container deployment
+    port = int(os.getenv("PORT", str(default_port)))
+    log_level = os.getenv("LOG_LEVEL", "info").lower()
+    uvicorn.run(app, host=host, port=port, log_level=log_level)

@@ -7,6 +7,10 @@ import {
   PolicyAction,
   PolicyDecisionResult,
   CandidateDecision,
+  BackendDecision,
+  BackendEvaluationOutcome,
+  ExternalPolicyBackend,
+  PolicyBackendEvaluationResult,
   ResolutionResult,
   ConflictResolutionStrategy,
   PolicyScope,
@@ -14,6 +18,15 @@ import {
 } from './types';
 
 export type PolicyDecision = LegacyPolicyDecision;
+
+const VALID_POLICY_ACTIONS = new Set<string>(['allow', 'deny', 'warn', 'require_approval', 'log']);
+
+function asPolicyAction(value: unknown): PolicyAction | undefined {
+  if (typeof value === 'string' && VALID_POLICY_ACTIONS.has(value)) {
+    return value as PolicyAction;
+  }
+  return undefined;
+}
 
 // ΓöÇΓöÇ Conflict Resolution ΓöÇΓöÇ
 
@@ -149,6 +162,41 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
 }
 
 /**
+ * Split `expr` on the literal separator `sep` only at positions that are
+ * outside of single- or double-quoted string literals. A naive
+ * `String.split(' or ')` mis-splits expressions like
+ * `name == 'foo or bar'` because the operator substring also appears inside
+ * the string literal; this helper walks the expression once, tracking quote
+ * state, and only treats separator occurrences outside quotes as boundaries.
+ * If no out-of-quote occurrence is found, the result has length 1 and the
+ * caller falls through to the comparison-operator branches.
+ */
+function splitOutsideQuotes(expr: string, sep: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i <= expr.length - sep.length; i++) {
+    const ch = expr[i];
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (!inSingle && !inDouble && expr.startsWith(sep, i)) {
+      parts.push(expr.slice(start, i));
+      start = i + sep.length;
+      i += sep.length - 1;
+    }
+  }
+  parts.push(expr.slice(start));
+  return parts;
+}
+
+/**
  * Evaluate a condition expression string against a context dictionary.
  * Supports: equality, inequality, numeric comparisons, `in` operator,
  * boolean attributes, and compound `and`/`or`.
@@ -156,16 +204,17 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
 function evaluateExpression(expr: string, context: Record<string, unknown>): boolean {
   const trimmed = expr.trim();
 
-  // OR conditions (lowest precedence)
-  if (trimmed.includes(' or ')) {
-    const parts = trimmed.split(' or ');
-    return parts.some((p) => evaluateExpression(p.trim(), context));
+  // OR conditions (lowest precedence) — only split on out-of-quote separators
+  // so `name == 'foo or bar'` is not mis-tokenised.
+  const orParts = splitOutsideQuotes(trimmed, ' or ');
+  if (orParts.length > 1) {
+    return orParts.some((p) => evaluateExpression(p.trim(), context));
   }
 
-  // AND conditions
-  if (trimmed.includes(' and ')) {
-    const parts = trimmed.split(' and ');
-    return parts.every((p) => evaluateExpression(p.trim(), context));
+  // AND conditions — same out-of-quote split.
+  const andParts = splitOutsideQuotes(trimmed, ' and ');
+  if (andParts.length > 1) {
+    return andParts.every((p) => evaluateExpression(p.trim(), context));
   }
 
   // NOT IN: path not in ['a', 'b']
@@ -321,6 +370,7 @@ export class PolicyEngine {
   private _policies: Map<string, Policy> = new Map();
   private _rateLimits: Map<string, RateLimitState> = new Map();
   private _resolver: PolicyConflictResolver;
+  private _backends: ExternalPolicyBackend[] = [];
 
   /** Legacy flat rules for backward compatibility. */
   private _legacyRules: PolicyRule[] = [];
@@ -345,7 +395,7 @@ export class PolicyEngine {
   loadYaml(yamlContent: string): Policy {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const yaml = require('js-yaml');
-    const data = yaml.load(yamlContent) as Record<string, unknown>;
+    const data = yaml.load(yamlContent, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>;
     const policy = dataToPolicy(data);
     this.loadPolicy(policy);
     return policy;
@@ -380,6 +430,18 @@ export class PolicyEngine {
     this._rateLimits.clear();
   }
 
+  registerBackend(backend: ExternalPolicyBackend): void {
+    this._backends.push(backend);
+  }
+
+  listBackends(): string[] {
+    return this._backends.map((backend) => backend.name);
+  }
+
+  clearBackends(): void {
+    this._backends = [];
+  }
+
   /**
    * Evaluate all applicable policies for an agent action.
    * Returns a rich PolicyDecisionResult with matched rule, timing, etc.
@@ -404,7 +466,7 @@ export class PolicyEngine {
 
         for (const rule of policy.rules) {
           if (rule.enabled === false) continue;
-          const ruleAction = rule.ruleAction ?? (rule.effect as PolicyAction | undefined) ?? 'deny';
+          const ruleAction = rule.ruleAction ?? asPolicyAction(rule.effect) ?? 'deny';
           if (evaluateRuleCondition(rule, context)) {
             candidates.push({
               action: ruleAction,
@@ -457,9 +519,9 @@ export class PolicyEngine {
       }
     }
 
-    // No rules matched ΓÇö use default
+    // No rules matched - fail closed.
     const defaultAction =
-      applicable.length > 0 ? (applicable[0].default_action ?? 'deny') : 'allow';
+      applicable.length > 0 ? (applicable[0].default_action ?? 'deny') : 'deny';
     const elapsed = performance.now() - start;
     return {
       allowed: defaultAction === 'allow',
@@ -472,6 +534,84 @@ export class PolicyEngine {
     };
   }
 
+  async evaluateWithBackends(
+    action: string,
+    context: Record<string, unknown> = {},
+  ): Promise<PolicyBackendEvaluationResult> {
+    const localDecision = this.evaluate(action, context);
+    if (localDecision === 'deny') {
+      return {
+        localDecision,
+        backendResults: [],
+        effectiveDecision: 'deny',
+        deniedBy: ['local'],
+      };
+    }
+
+    const backendResults = await Promise.all(
+      this._backends.map((backend) => this.runActionBackend(backend, action, context)),
+    );
+
+    const effectiveDecision = resolveEffectiveDecision(localDecision, backendResults);
+    const deniedBy = collectDeniedBy(backendResults, effectiveDecision === 'deny');
+
+    return {
+      localDecision,
+      backendResults,
+      effectiveDecision,
+      deniedBy,
+    };
+  }
+
+  async evaluatePolicyWithBackends(
+    agentDid: string,
+    context: Record<string, unknown>,
+  ): Promise<PolicyBackendEvaluationResult> {
+    const localDecision = this.evaluatePolicy(agentDid, context);
+    if (!localDecision.allowed) {
+      const effectiveDecision = localDecision.action === 'require_approval' ? 'review' : 'deny';
+      return {
+        localDecision,
+        backendResults: [],
+        effectiveDecision,
+        effectivePolicyResult: localDecision,
+        deniedBy: effectiveDecision === 'deny' ? ['local'] : [],
+      };
+    }
+
+    const backendResults = await Promise.all(
+      this._backends.map((backend) => this.runPolicyBackend(backend, agentDid, context)),
+    );
+
+    const effectiveDecision = resolveEffectiveDecision('allow', backendResults);
+    const deniedBy = collectDeniedBy(backendResults, effectiveDecision === 'deny');
+
+    let effectivePolicyResult = localDecision;
+    if (effectiveDecision === 'deny') {
+      effectivePolicyResult = {
+        ...localDecision,
+        allowed: false,
+        action: 'deny',
+        reason: `Denied by policy backend: ${deniedBy.filter((name) => name !== 'local').join(', ')}`,
+      };
+    } else if (effectiveDecision === 'review') {
+      effectivePolicyResult = {
+        ...localDecision,
+        allowed: false,
+        action: 'require_approval',
+        reason: 'Review required by policy backend',
+      };
+    }
+
+    return {
+      localDecision,
+      backendResults,
+      effectiveDecision,
+      effectivePolicyResult,
+      deniedBy,
+    };
+  }
+
   // ΓöÇΓöÇ Legacy v0.1 API (backward compatible) ΓöÇΓöÇ
 
   /** Load policy rules from a YAML file (legacy flat format). */
@@ -479,7 +619,7 @@ export class PolicyEngine {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const yaml = require('js-yaml');
     const content = readFileSync(yamlPath, 'utf-8');
-    const doc = yaml.load(content) as { rules?: PolicyRule[] };
+    const doc = yaml.load(content, { schema: yaml.JSON_SCHEMA }) as { rules?: PolicyRule[] };
     if (doc?.rules && Array.isArray(doc.rules)) {
       this._legacyRules.push(...doc.rules);
     }
@@ -565,6 +705,56 @@ export class PolicyEngine {
     }
     state.count++;
   }
+
+  private async runActionBackend(
+    backend: ExternalPolicyBackend,
+    action: string,
+    context: Record<string, unknown>,
+  ): Promise<BackendEvaluationOutcome> {
+    if (!backend.evaluateAction) {
+      return {
+        backend: backend.name,
+        decision: 'allow',
+        reason: 'No action evaluator registered',
+      };
+    }
+
+    try {
+      const result = await backend.evaluateAction(action, context);
+      return normalizeBackendOutcome(backend.name, result);
+    } catch (error) {
+      return {
+        backend: backend.name,
+        decision: 'deny',
+        error: error instanceof Error ? error.message : 'Unknown backend error',
+      };
+    }
+  }
+
+  private async runPolicyBackend(
+    backend: ExternalPolicyBackend,
+    agentDid: string,
+    context: Record<string, unknown>,
+  ): Promise<BackendEvaluationOutcome> {
+    if (!backend.evaluatePolicy) {
+      return {
+        backend: backend.name,
+        decision: 'allow',
+        reason: 'No policy evaluator registered',
+      };
+    }
+
+    try {
+      const result = await backend.evaluatePolicy(agentDid, context);
+      return normalizeBackendOutcome(backend.name, result);
+    } catch (error) {
+      return {
+        backend: backend.name,
+        decision: 'deny',
+        error: error instanceof Error ? error.message : 'Unknown backend error',
+      };
+    }
+  }
 }
 
 // ΓöÇΓöÇ Helpers ΓöÇΓöÇ
@@ -614,11 +804,12 @@ function dataToPolicy(data: Record<string, unknown>): Policy {
         condition: r.condition as string | Record<string, unknown> | undefined,
         action: r.action as string | undefined,
         effect: r.effect as LegacyPolicyDecision | undefined,
-        ruleAction: r.ruleAction as PolicyAction | undefined,
+        ruleAction: asPolicyAction(r.ruleAction),
         limit: r.limit as string | undefined,
         approvers: r.approvers as string[] | undefined,
         priority: r.priority as number | undefined,
         enabled: r.enabled as boolean | undefined,
+        surfaces: r.surfaces as import('./types').GovernanceSurface[] | undefined,
       });
     }
   }
@@ -634,4 +825,63 @@ function dataToPolicy(data: Record<string, unknown>): Policy {
     rules,
     default_action: (data.default_action as 'allow' | 'deny') ?? 'deny',
   };
+}
+
+function normalizeBackendOutcome(
+  backendName: string,
+  result: BackendDecision | BackendEvaluationOutcome | PolicyDecisionResult,
+): BackendEvaluationOutcome {
+  if (typeof result === 'string') {
+    return {
+      backend: backendName,
+      decision: result,
+    };
+  }
+
+  if ('backend' in result && 'decision' in result) {
+    return {
+      backend: result.backend || backendName,
+      decision: result.decision,
+      reason: result.reason,
+      error: result.error,
+    };
+  }
+
+  return {
+    backend: backendName,
+    decision: result.allowed ? 'allow' : 'deny',
+    reason: result.reason,
+  };
+}
+
+function resolveEffectiveDecision(
+  localDecision: LegacyPolicyDecision,
+  backendResults: BackendEvaluationOutcome[],
+): LegacyPolicyDecision {
+  if (localDecision === 'deny') {
+    return 'deny';
+  }
+
+  if (backendResults.some((result) => result.decision === 'deny' || result.error)) {
+    return 'deny';
+  }
+
+  if (localDecision === 'review' || backendResults.some((result) => result.decision === 'review')) {
+    return 'review';
+  }
+
+  return 'allow';
+}
+
+function collectDeniedBy(
+  backendResults: BackendEvaluationOutcome[],
+  includeBackends: boolean,
+): string[] {
+  if (!includeBackends) {
+    return [];
+  }
+
+  return backendResults
+    .filter((result) => result.decision === 'deny' || result.error)
+    .map((result) => result.backend);
 }

@@ -35,7 +35,7 @@ what gets logged for audit.
 
 ## The MCP Proxy
 
-[`@microsoft/agentmesh-mcp-proxy`](../../../packages/agent-mesh/packages/mcp-proxy/README.md)
+[`@microsoft/agentmesh-mcp-proxy`](../../../agent-governance-python/agent-mesh/packages/mcp-proxy/README.md)
 sits **between the agent and the original MCP server**. The proxy intercepts
 requests and either forwards or blocks the call.
 
@@ -59,7 +59,7 @@ That makes the proxy the enforcement point in front of the MCP server.
 
 ## Policy YAML format
 
-Use [`standard.yaml`](../../../packages/agent-mesh/packages/mcp-proxy/policies/standard.yaml)
+Use [`standard.yaml`](../../../agent-governance-python/agent-mesh/packages/mcp-proxy/policies/standard.yaml)
 as the reference shape. Proxy policies are intentionally small: a header, a list
 of rules, and optional schema fields for rate limiting.
 
@@ -211,7 +211,7 @@ the practical alignment looks like this:
 | **ASI-05 Unexpected Code Execution** | Deny `run_shell`, `execute_command`, `eval`, and `spawn_process` |
 | **ASI-06 Memory & Context Poisoning** | Secret-path blocking and argument filtering prevent poisoned context from turning into exfiltration |
 | **ASI-07 Insecure Inter-Agent Communication** | Trust-gated MCP endpoints add authentication and trust checks before agents collaborate |
-| **ASI-08 Cascading Failures** | CLI rate limits and deny rules reduce runaway call chains |
+| **ASI-08 Cascading Agent Failures** | CLI rate limits and deny rules reduce runaway call chains |
 | **ASI-09 Human-Agent Trust Exploitation** | Audit visibility helps, and this guide naturally leads into approval workflows for sensitive actions |
 | **ASI-10 Rogue Agents** | Catch-all deny rules and rate caps confine agents that drift out of scope |
 
@@ -225,9 +225,9 @@ blocks risky tool calls before they reach the server.
 For some environments, allow/deny rules are not enough. You also want to know
 *who* is asking. This repo has two related Python packages:
 
-- [`mcp-trust-proxy`](../../../packages/agentmesh-integrations/mcp-trust-proxy/README.md)
+- [`mcp-trust-proxy`](../../../agent-governance-python/agentmesh-integrations/mcp-trust-proxy/README.md)
   is the inline trust-gating layer.
-- [`mcp-trust-server`](../../../packages/agent-mesh/packages/mcp-trust-server/README.md)
+- [`mcp-trust-server`](../../../agent-governance-python/agent-mesh/packages/mcp-trust-server/README.md)
   is an MCP server that exposes trust-management tools such as `check_trust`,
   `get_trust_score`, `establish_handshake`, and `verify_delegation`.
 
@@ -262,7 +262,7 @@ Use `mcp-trust-server` alongside that when you want trust operations over MCP.
 
 ## Next steps
 
-1. Read [`enterprise.yaml`](../../../packages/agent-mesh/packages/mcp-proxy/policies/enterprise.yaml).
+1. Read [`enterprise.yaml`](../../../agent-governance-python/agent-mesh/packages/mcp-proxy/policies/enterprise.yaml).
 2. Review [`docs/compliance/owasp-llm-top10-mapping.md`](../../compliance/owasp-llm-top10-mapping.md)
    and [`docs/OWASP-COMPLIANCE.md`](../../OWASP-COMPLIANCE.md).
 3. Start with `standard`, then move to `strict` or custom rules.

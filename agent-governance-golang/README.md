@@ -1,6 +1,10 @@
 # AgentMesh Go module
 
-Go module for the AgentMesh governance framework — identity, trust scoring, policy evaluation, tamper-evident audit logging, MCP security scanning, execution privilege rings, and agent lifecycle management.
+[![CI](https://github.com/microsoft/agent-governance-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/microsoft/agent-governance-toolkit/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/microsoft/agent-governance-toolkit/agent-governance-golang.svg)](https://pkg.go.dev/github.com/microsoft/agent-governance-toolkit/agent-governance-golang)
+
+Go module for the AgentMesh governance framework — identity, trust scoring, policy evaluation, tamper-evident audit logging, MCP security scanning, execution privilege rings, kill switches, agent lifecycle management, SLO tracking, shadow discovery, prompt defense, and native Go integrations.
 
 ## Install
 
@@ -8,7 +12,16 @@ Go module for the AgentMesh governance framework — identity, trust scoring, po
 go get github.com/microsoft/agent-governance-toolkit/agent-governance-golang
 ```
 
+Verify the module is available:
+
+```bash
+go list -m github.com/microsoft/agent-governance-toolkit/agent-governance-golang
+```
+
 ## Quick Start
+
+> See [`examples/quickstart/`](./examples/quickstart/) for a runnable,
+> compile-checked version of the snippet below.
 
 ```go
 package main
@@ -17,7 +30,7 @@ import (
 	"fmt"
 	"log"
 
-	agentmesh "github.com/microsoft/agent-governance-toolkit/agent-governance-golang"
+	agentmesh "github.com/microsoft/agent-governance-toolkit/agent-governance-golang/packages/agentmesh"
 )
 
 func main() {
@@ -46,6 +59,7 @@ func main() {
 ### Identity (`identity.go`)
 
 Ed25519-based agent identities with DID support.
+**Example:** [`examples/identity-sign-verify/`](./examples/identity-sign-verify/)
 
 | Function / Method | Description |
 |---|---|
@@ -58,11 +72,12 @@ Ed25519-based agent identities with DID support.
 ### Trust (`trust.go`)
 
 Decay-based trust scoring with asymmetric reward/penalty.
+**Example:** [`examples/trust-scoring/`](./examples/trust-scoring/)
 
 | Function / Method | Description |
 |---|---|
 | `NewTrustManager(config)` | Create a trust manager |
-| `(*TrustManager).VerifyPeer(id, identity)` | Verify a peer |
+| `(*TrustManager).VerifyPeer(id, identity)` | Fail closed unless independent verification evidence is available |
 | `(*TrustManager).GetTrustScore(agentID)` | Get current trust score |
 | `(*TrustManager).RecordSuccess(agentID, reward)` | Record a successful interaction |
 | `(*TrustManager).RecordFailure(agentID, penalty)` | Record a failed interaction |
@@ -70,16 +85,34 @@ Decay-based trust scoring with asymmetric reward/penalty.
 ### Policy (`policy.go`)
 
 Rule-based policy engine with wildcard and condition matching.
+**Example:** [`examples/policy-yaml/`](./examples/policy-yaml/)
 
 | Function / Method | Description |
 |---|---|
 | `NewPolicyEngine(rules)` | Create a policy engine |
 | `(*PolicyEngine).Evaluate(action, context)` | Evaluate an action |
-| `(*PolicyEngine).LoadFromYAML(path)` | Load rules from YAML file |
+| `(*PolicyEngine).LoadFromYAML(path)` | Replace rules from YAML file |
+| `(*PolicyEngine).MergeFromYAML(path)` | Append rules from a YAML file to the existing rule set |
+| `(*PolicyEngine).AddBackend(backend)` | Register an external policy backend |
+| `(*PolicyEngine).LoadRego(options)` | Register an OPA/Rego backend |
+| `(*PolicyEngine).LoadCedar(options)` | Register a Cedar backend |
+
+### External Policy Backends (`policy_backends.go`)
+
+OPA/Rego and Cedar support with fail-closed evaluation paths.
+**Example:** [`examples/policy-opa-cedar/`](./examples/policy-opa-cedar/)
+
+| Type / Function | Description |
+|---|---|
+| `NewOPABackend(options)` | Create an OPA backend with remote, CLI, or built-in modes |
+| `NewCedarBackend(options)` | Create a Cedar backend with CLI or built-in modes |
+| `OPAOptions` | Configure OPA URL, package/query, timeout, and Rego content |
+| `CedarOptions` | Configure Cedar policy content, entities, schema, and timeout |
 
 ### Audit (`audit.go`)
 
 SHA-256 hash-chained audit log for tamper detection.
+**Example:** [`examples/audit-chain/`](./examples/audit-chain/)
 
 | Function / Method | Description |
 |---|---|
@@ -91,6 +124,7 @@ SHA-256 hash-chained audit log for tamper detection.
 ### Client (`client.go`)
 
 Unified governance client combining all modules.
+**Example:** [`examples/quickstart/`](./examples/quickstart/)
 
 | Function / Method | Description |
 |---|---|
@@ -100,6 +134,7 @@ Unified governance client combining all modules.
 ### MCP Security (`mcp.go`)
 
 Detects tool poisoning, typosquatting, hidden instructions, and rug-pull patterns in MCP tool definitions.
+**Example:** [`examples/mcp-scan/`](./examples/mcp-scan/)
 
 | Function / Method | Description |
 |---|---|
@@ -119,6 +154,7 @@ fmt.Printf("Safe: %v, Risk: %d\n", result.Safe, result.RiskScore)
 ### Execution Rings (`rings.go`)
 
 Privilege ring model for agent access control (Ring 0 = Admin … Ring 3 = Sandboxed).
+**Example:** [`examples/execution-rings/`](./examples/execution-rings/)
 
 | Function / Method | Description |
 |---|---|
@@ -135,9 +171,39 @@ enforcer.Assign("agent-1", agentmesh.RingStandard)
 fmt.Println(enforcer.CheckAccess("agent-1", "data.read")) // true
 ```
 
+### Kill Switch (`kill_switch.go`)
+
+Scoped execution stop controls for global, agent, and capability-level containment.
+**Example:** [`examples/kill-switch-scopes/`](./examples/kill-switch-scopes/)
+
+| Type / Function | Description |
+|---|---|
+| `NewKillSwitch()` | Create a single kill switch |
+| `NewKillSwitchRegistry()` | Create a scoped kill switch registry |
+| `GlobalKillSwitchScope()` | Target all execution globally |
+| `AgentKillSwitchScope(agentID)` | Target one agent |
+| `CapabilityKillSwitchScope(capability)` | Target one capability or tool |
+| `(*KillSwitchRegistry).Activate(scope, reason, message)` | Activate a scoped kill switch |
+| `(*KillSwitchRegistry).Clear(scope, reason, message)` | Clear a scoped kill switch |
+| `(*KillSwitchRegistry).DecisionFor(agentID, capability)` | Resolve whether execution is currently allowed |
+| `(*KillSwitchRegistry).History()` | Return the recorded activation/clear history |
+
+```go
+registry := agentmesh.NewKillSwitchRegistry()
+_, _ = registry.Activate(
+    agentmesh.AgentKillSwitchScope("agent-1"),
+    agentmesh.KillSwitchReasonSecurityIncident,
+    "contain suspicious behavior",
+)
+
+decision := registry.DecisionFor("agent-1", "tool.run")
+fmt.Printf("Allowed: %v\n", decision.Allowed) // false
+```
+
 ### Lifecycle (`lifecycle.go`)
 
 Eight-state lifecycle model with validated transitions.
+**Example:** [`examples/lifecycle-transitions/`](./examples/lifecycle-transitions/)
 
 States: `provisioning` → `active` → `suspended` / `rotating` / `degraded` / `quarantined` → `decommissioning` → `decommissioned`
 
@@ -161,6 +227,78 @@ lm.Activate("maintenance complete")
 fmt.Println(lm.State()) // active
 ```
 
+### SRE / SLOs (`slo.go`)
+
+Minimal service-level objective tracking for Go applications.
+**Example:** [`examples/slo-tracking/`](./examples/slo-tracking/)
+
+| Type / Function | Description |
+|---|---|
+| `NewSLOEngine(objectives)` | Create an engine with named objectives |
+| `(*SLOEngine).AddObjective(objective)` | Register a new SLO |
+| `(*SLOEngine).RecordEvent(name, success, latency)` | Record a request or operation outcome |
+| `(*SLOEngine).Evaluate(name)` | Compute current attainment and error budget |
+
+### Framework Integrations (`middleware.go`)
+
+Go-native integration helpers built around a composable governance middleware stack.
+**Examples:** [`examples/http-middleware/`](./examples/http-middleware/) · [`examples/http-middleware-fail-closed/`](./examples/http-middleware-fail-closed/) · [`examples/full-stack/`](./examples/full-stack/)
+
+| Type / Function | Description |
+|---|---|
+| `GovernedOperation` | Common operation envelope for tool calls, prompts, and request flows |
+| `CreateGovernanceMiddlewareStack(config)` | Compose audit, kill switch, policy, capability guard, prompt defense, and SLO middleware |
+| `NewHTTPGovernanceMiddleware(config)` | Create `net/http` middleware backed by the governance stack |
+| `GovernOperation(...)` | Wrap a generic operation with the standard governance stack |
+
+`NewHTTPGovernanceMiddleware` now fails closed unless `HTTPMiddlewareConfig.AgentIDResolver`
+returns a verified identity. Caller-asserted `X-Agent-ID` values are exposed to policy as
+`caller_asserted_agent_id`, but they are no longer treated as trusted `agent_id` values by
+default.
+
+For short-lived migrations behind a trusted front door, opt in explicitly:
+
+```go
+middleware, err := agentmesh.NewHTTPGovernanceMiddleware(agentmesh.HTTPMiddlewareConfig{
+    Policy:                    policy,
+    AgentIDResolver:           agentmesh.LegacyTrustedHeaderAgentIDResolver("X-Agent-ID"),
+    PromptDefense:             agentmesh.NewPromptDefenseEvaluator(),
+    PromptDefenseMaxRiskScore: 24,
+})
+```
+
+Recommended migration path: wire `AgentIDResolver` to your authenticated reverse proxy,
+service mesh, or workload identity layer so it returns a verified agent identity. Use
+`LegacyTrustedHeaderAgentIDResolver` only as an explicit compatibility bridge while you move
+away from caller-asserted headers.
+
+### Shadow Discovery (`discovery.go`)
+
+Structured SDK discovery for likely unregistered agent tooling across text, processes, config paths, and GitHub repositories.
+**Example:** [`examples/shadow-discovery/`](./examples/shadow-discovery/)
+
+| Type / Function | Description |
+|---|---|
+| `DiscoveredAgent` / `DiscoveryEvidence` / `DiscoveryScanResult` | Structured discovery models for evidence-driven results |
+| `NewShadowDiscoveryScanner()` | Create a scanner with built-in discovery rules |
+| `(*ShadowDiscoveryScanner).ScanText(source, content)` | Scan config or source text for findings |
+| `(*ShadowDiscoveryScanner).ScanProcessCommands(commands)` | Scan raw command lines supplied by the caller |
+| `(*ShadowDiscoveryScanner).ScanProcesses(processes)` | Produce structured discovery results from process metadata |
+| `(*ShadowDiscoveryScanner).ScanCurrentHostProcessList()` | Enumerate and scan the local process list |
+| `(*ShadowDiscoveryScanner).ScanConfigPaths(paths, maxDepth)` | Scan config and dependency files across filesystem paths |
+| `(*ShadowDiscoveryScanner).ScanGitHubRepositories(client, repos)` | Scan repository contents through the GitHub contents API |
+| `NewGitHubDiscoveryClient(token)` | Create a GitHub API client for repository discovery scans |
+
+### Prompt Defense (`promptdefense.go`)
+
+Structured prompt risk evaluation for injection and exfiltration patterns.
+**Example:** [`examples/prompt-defense/`](./examples/prompt-defense/)
+
+| Type / Function | Description |
+|---|---|
+| `NewPromptDefenseEvaluator()` | Create a prompt defense evaluator |
+| `(*PromptDefenseEvaluator).Evaluate(prompt)` | Score a prompt and return structured findings |
+
 ## License
 
-See repository root [LICENSE](../../LICENSE).
+See repository root [LICENSE](../LICENSE).

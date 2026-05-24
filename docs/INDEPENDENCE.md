@@ -24,7 +24,7 @@ Core paths (`agent_os/`, `agentmesh/`, `agent_hypervisor/`, `agent_sre/`) must f
 | **agentmesh** (Rust) | None — pure crypto + serde | ✅ Independent |
 | **agentmesh-mcp** (Rust) | None — pure crypto + serde | ✅ Independent |
 | **agentmesh** (Go) | None — yaml.v3 only | ✅ Independent |
-| **@microsoft/agentmesh-sdk** (TypeScript) | None — zero runtime deps | ✅ Independent |
+| **@microsoft/agent-governance-sdk** (TypeScript) | None — zero runtime deps | ✅ Independent |
 | **Microsoft.AgentGovernance** (.NET) | None — YamlDotNet only | ✅ Independent |
 
 ## Adapter Pattern
@@ -33,13 +33,13 @@ Framework integrations are published as **separate packages** that depend on AGT
 
 | Adapter Package | Framework | Install |
 |-----------------|-----------|---------|
-| `langchain-agentmesh` | LangChain | `pip install langchain-agentmesh` |
+| `langchain-agentmesh` | LangChain | `pip install agentmesh-langchain` |
 | `llamaindex-agentmesh` | LlamaIndex | `pip install llamaindex-agentmesh` |
 | `crewai-agentmesh` | CrewAI | `pip install crewai-agentmesh` |
 | `openai-agents-agentmesh` | OpenAI Agents | `pip install openai-agents-agentmesh` |
 | `pydantic-ai-governance` | Pydantic AI | `pip install pydantic-ai-governance` |
-| `aps-agentmesh` | APS | `pip install aps-agentmesh` |
-| `scopeblind-protect-mcp` | ScopeBlind | `pip install scopeblind-protect-mcp` |
+
+
 
 Adapters **must** use try/except for all framework imports so they fail gracefully when the framework isn't installed.
 

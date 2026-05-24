@@ -29,7 +29,7 @@ implementation evidence, and provides an honest coverage assessment.
 | ASI05 | Unexpected Code Execution | ✅ Full | Static reviewer detects pickle/eval |
 | ASI06 | Memory and Context Poisoning | ⚠️ Partial | Audit hash-chain; no memory sandbox |
 | ASI07 | Insecure Inter-Agent Communication | ✅ Full | Trust-gate with DID verification |
-| ASI08 | Cascading Failures | ✅ Full | Circuit breaker, rate limiter |
+| ASI08 | Cascading Agent Failures | ✅ Full | Circuit breaker, rate limiter |
 | ASI09 | Human-Agent Trust Exploitation | ⚠️ Partial | Audit trail; no UI-level guardrails |
 | ASI10 | Rogue Agents | ✅ Full | `AgentBehaviorMonitor`, quarantine |
 | ASI11 | Agent Untraceability | ✅ Full | Tamper-evident audit log (hash chain) |
@@ -74,8 +74,8 @@ to every inbound message before it reaches the LLM. Patterns are loaded from
 the policy YAML at runtime — not hardcoded in source.
 
 **Evidence:**
-- `packages/agent-os-kernel/agent_os/governance/middleware.py` — `_check_blocked_patterns()`
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `no-prompt-injection-guards`
+- `agent-governance-python/agent-os/src/agent_os/governance/middleware.py` — `_check_blocked_patterns()`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `no-prompt-injection-guards`
 
 **Coverage:** ✅ Full
 
@@ -90,8 +90,8 @@ deny-list enforcement and per-tool rate limits. The static reviewer flags
 unguarded `.execute()` calls.
 
 **Evidence:**
-- `packages/agent-os-kernel/agent_os/governance/tool_wrapper.py`
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rules `unguarded-tool-execution`, `no-tool-allowlist`
+- `agent-governance-python/agent-os/src/agent_os/governance/tool_wrapper.py`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rules `unguarded-tool-execution`, `no-tool-allowlist`
 
 **Coverage:** ✅ Full
 
@@ -105,8 +105,8 @@ unguarded `.execute()` calls.
 forwarding. Policy YAML supports field-level `pii_fields` configuration.
 
 **Evidence:**
-- `packages/agent-os-kernel/agent_os/governance/middleware.py` — `_redact_pii()`
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-pii-redaction`
+- `agent-governance-python/agent-os/src/agent_os/governance/middleware.py` — `_redact_pii()`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-pii-redaction`
 
 **Coverage:** ✅ Full
 
@@ -125,7 +125,7 @@ built into AGT. Recommend integrating with GitHub Advanced Security /
 Dependabot for dependency-level supply-chain coverage.
 
 **Evidence:**
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `hardcoded-security-denylist`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `hardcoded-security-denylist`
 - Policy YAML schema: `allowed_tools`, `blocked_tools`
 
 **Coverage:** ⚠️ Partial
@@ -141,7 +141,7 @@ verification and flags it as critical. The governance policy blocks `eval()`
 and `exec()` in agent code via lint rules.
 
 **Evidence:**
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `unsafe-deserialization`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `unsafe-deserialization`
 
 **Coverage:** ✅ Full
 
@@ -159,7 +159,7 @@ provide memory integrity checksums at the application layer.
 Consider adding a `ContextValidator` that hashes memory snapshots.
 
 **Evidence:**
-- `packages/agent-os-kernel/agent_os/audit/hash_chain.py`
+- `agent-governance-python/agent-os/src/agent_os/audit/hash_chain.py`
 
 **Coverage:** ⚠️ Partial
 
@@ -174,14 +174,14 @@ before any agent-to-agent handoff. The static reviewer detects missing trust
 verification in multi-agent orchestration code.
 
 **Evidence:**
-- `packages/agent-os-kernel/agent_os/trust/gate.py`
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-trust-verification`
+- `agent-governance-python/agent-os/src/agent_os/trust/gate.py`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-trust-verification`
 
 **Coverage:** ✅ Full
 
 ---
 
-### ASI08 — Cascading Failures
+### ASI08 — Cascading Agent Failures
 
 **Risk:** A failure in one agent propagates through the system.
 
@@ -189,8 +189,8 @@ verification in multi-agent orchestration code.
 failures, preventing cascade. Rate limiting caps per-minute tool invocations.
 
 **Evidence:**
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-circuit-breaker`
-- `packages/agent-os-kernel/agent_os/governance/middleware.py` — `_rate_limit_check()`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-circuit-breaker`
+- `agent-governance-python/agent-os/src/agent_os/governance/middleware.py` — `_rate_limit_check()`
 
 **Coverage:** ✅ Full
 
@@ -208,7 +208,7 @@ approval workflows are built into AGT. Consider adding a `HumanApproval`
 middleware for high-risk actions.
 
 **Evidence:**
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-audit-logging`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-audit-logging`
 
 **Coverage:** ⚠️ Partial
 
@@ -223,8 +223,8 @@ rate, failure rate, privilege escalation attempts) and quarantines agents that
 exceed thresholds.
 
 **Evidence:**
-- `packages/agent-os-kernel/agent_os/services/behavior_monitor.py`
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `no-behavior-monitoring`
+- `agent-governance-python/agent-os/src/agent_os/services/behavior_monitor.py`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `no-behavior-monitoring`
 
 **Coverage:** ✅ Full
 
@@ -239,8 +239,8 @@ entry contains the SHA-256 of the previous entry, making tampering detectable.
 The static reviewer flags code without audit logging.
 
 **Evidence:**
-- `packages/agent-os-kernel/agent_os/audit/hash_chain.py`
-- `packages/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-audit-logging`
+- `agent-governance-python/agent-os/src/agent_os/audit/hash_chain.py`
+- `agent-governance-python/agentmesh-integrations/copilot-governance/src/reviewer.ts` — rule `missing-audit-logging`
 
 **Coverage:** ✅ Full
 

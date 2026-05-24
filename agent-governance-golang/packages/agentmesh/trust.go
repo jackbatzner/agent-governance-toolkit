@@ -4,12 +4,18 @@
 package agentmesh
 
 import (
+	"crypto/ed25519"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"sync"
 )
+
+// ErrPeerVerificationEvidenceRequired is returned when VerifyPeer lacks independent verification evidence.
+var ErrPeerVerificationEvidenceRequired = errors.New("peer verification requires independent evidence")
 
 // TrustScore represents an agent's current trust standing.
 type TrustScore struct {
@@ -32,6 +38,11 @@ type persistedState struct {
 	Interactions int     `json:"interactions"`
 }
 
+// maxTrackedAgents caps the number of unique agent IDs tracked in the
+// scores map to bound memory growth.  When exceeded the least-recently-
+// updated entry is evicted.
+const maxTrackedAgents = 10_000
+
 // TrustManager tracks and updates per-agent trust scores.
 type TrustManager struct {
 	mu     sync.RWMutex
@@ -51,15 +62,33 @@ func NewTrustManager(config TrustConfig) *TrustManager {
 	return tm
 }
 
-// VerifyPeer verifies a peer's identity and returns the current trust score.
+// VerifyPeer returns the current trust score but fails closed unless the caller has
+// independent verification evidence beyond the peer's self-attested identity data.
 func (tm *TrustManager) VerifyPeer(peerID string, peerIdentity *AgentIdentity) (*TrustVerificationResult, error) {
-	verified := peerIdentity != nil && peerIdentity.PublicKey != nil && len(peerIdentity.PublicKey) == 32
 	score := tm.GetTrustScore(peerID)
-	return &TrustVerificationResult{
+	result := &TrustVerificationResult{
 		PeerID:   peerID,
-		Verified: verified,
+		Verified: false,
 		Score:    score,
-	}, nil
+	}
+
+	if peerIdentity == nil {
+		return result, fmt.Errorf("%w: no peer identity provided for %q", ErrPeerVerificationEvidenceRequired, peerID)
+	}
+	if len(peerIdentity.PublicKey) != ed25519.PublicKeySize {
+		return result, fmt.Errorf(
+			"%w: peer %q presented a self-attested public key with invalid length %d",
+			ErrPeerVerificationEvidenceRequired,
+			peerID,
+			len(peerIdentity.PublicKey),
+		)
+	}
+
+	return result, fmt.Errorf(
+		"%w: peer %q only presented self-attested identity data",
+		ErrPeerVerificationEvidenceRequired,
+		peerID,
+	)
 }
 
 // GetTrustScore returns the current trust score for an agent.
@@ -85,35 +114,59 @@ func (tm *TrustManager) GetTrustScore(agentID string) TrustScore {
 
 // RecordSuccess increases an agent's trust score with decay.
 func (tm *TrustManager) RecordSuccess(agentID string, reward float64) {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
+	snapshot := func() persistedScores {
+		tm.mu.Lock()
+		defer tm.mu.Unlock()
 
-	s := tm.getOrCreate(agentID)
-	s.interactions++
-	decayed := tm.applyDecay(s.score)
-	s.score = math.Min(1.0, decayed+reward*tm.config.RewardFactor)
-	_ = tm.saveToDisk()
+		s := tm.getOrCreate(agentID)
+		s.interactions++
+		decayed := tm.applyDecay(s.score)
+		s.score = math.Min(1.0, decayed+reward*tm.config.RewardFactor)
+		return tm.snapshotForPersist()
+	}()
+	_ = tm.persistSnapshot(snapshot)
 }
 
 // RecordFailure decreases an agent's trust score with asymmetric penalty.
 func (tm *TrustManager) RecordFailure(agentID string, penalty float64) {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
+	snapshot := func() persistedScores {
+		tm.mu.Lock()
+		defer tm.mu.Unlock()
 
-	s := tm.getOrCreate(agentID)
-	s.interactions++
-	decayed := tm.applyDecay(s.score)
-	s.score = math.Max(0.0, decayed-penalty*tm.config.PenaltyFactor)
-	_ = tm.saveToDisk()
+		s := tm.getOrCreate(agentID)
+		s.interactions++
+		decayed := tm.applyDecay(s.score)
+		s.score = math.Max(0.0, decayed-penalty*tm.config.PenaltyFactor)
+		return tm.snapshotForPersist()
+	}()
+	_ = tm.persistSnapshot(snapshot)
 }
 
 func (tm *TrustManager) getOrCreate(agentID string) *scoreState {
 	s, ok := tm.scores[agentID]
 	if !ok {
+		if len(tm.scores) >= maxTrackedAgents {
+			tm.evictOldest()
+		}
 		s = &scoreState{score: tm.config.InitialScore}
 		tm.scores[agentID] = s
 	}
 	return s
+}
+
+// evictOldest removes the entry with the fewest interactions (least active).
+func (tm *TrustManager) evictOldest() {
+	var evictKey string
+	minInteractions := int(^uint(0) >> 1) // max int
+	for k, v := range tm.scores {
+		if v.interactions < minInteractions {
+			minInteractions = v.interactions
+			evictKey = k
+		}
+	}
+	if evictKey != "" {
+		delete(tm.scores, evictKey)
+	}
 }
 
 func (tm *TrustManager) applyDecay(score float64) float64 {
@@ -155,12 +208,13 @@ func (tm *TrustManager) loadFromDisk() error {
 	return nil
 }
 
-func (tm *TrustManager) saveToDisk() error {
-	if tm.config.PersistPath == "" {
-		return nil
-	}
+// snapshotForPersist returns a deep-copied view of the current scores
+// suitable for persisting outside the lock. Callers MUST hold tm.mu
+// (any mode) when invoking this; the snapshot itself is independent of
+// the live map afterwards.
+func (tm *TrustManager) snapshotForPersist() persistedScores {
 	persisted := persistedScores{
-		Scores: make(map[string]*persistedState),
+		Scores: make(map[string]*persistedState, len(tm.scores)),
 	}
 	for id, s := range tm.scores {
 		persisted.Scores[id] = &persistedState{
@@ -168,9 +222,48 @@ func (tm *TrustManager) saveToDisk() error {
 			Interactions: s.interactions,
 		}
 	}
+	return persisted
+}
+
+// persistSnapshot writes a previously-captured snapshot to disk
+// atomically (write to a sibling temp file, then rename). Marshalling
+// and the disk write happen WITHOUT holding tm.mu — concurrent readers
+// and writers are not blocked on disk I/O. A crash mid-write leaves
+// either the old file or the new one, never a half-written file.
+func (tm *TrustManager) persistSnapshot(persisted persistedScores) error {
+	if tm.config.PersistPath == "" {
+		return nil
+	}
 	data, err := json.MarshalIndent(persisted, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshalling trust state: %w", err)
 	}
-	return os.WriteFile(tm.config.PersistPath, data, 0644)
+
+	dir := filepath.Dir(tm.config.PersistPath)
+	tmp, err := os.CreateTemp(dir, ".trust-*.json.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpName) }
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("writing temp file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("syncing temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("closing temp file: %w", err)
+	}
+	if err := os.Rename(tmpName, tm.config.PersistPath); err != nil {
+		cleanup()
+		return fmt.Errorf("renaming temp file: %w", err)
+	}
+	return nil
 }

@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 import { AgentIdentity } from './identity';
 import {
@@ -40,6 +41,10 @@ export class TrustManager {
     };
     this.persistPath = config?.persistPath;
     if (this.persistPath) {
+      // Reject paths containing traversal components
+      if (this.persistPath.includes('..')) {
+        throw new Error('persistPath must not contain path traversal components');
+      }
       this.loadFromDisk();
     }
   }
@@ -49,19 +54,13 @@ export class TrustManager {
     peerId: string,
     peerIdentity: AgentIdentity,
   ): Promise<TrustVerificationResult> {
-    // Verify the identity is self-consistent (DID contains the key fingerprint)
-    const challenge = new Uint8Array(
-      require('crypto').randomBytes(32),
-    );
-    const signature = peerIdentity.sign(challenge);
-    const verified = peerIdentity.verify(challenge, signature);
-
     const trustScore = this.getTrustScore(peerId);
+    const reason = this.getPeerVerificationFailure(peerId, peerIdentity);
 
     return {
-      verified,
+      verified: reason === undefined,
       trustScore,
-      reason: verified ? undefined : 'Identity verification failed',
+      reason,
     };
   }
 
@@ -87,7 +86,7 @@ export class TrustManager {
     const state = this.getOrCreateState(agentId);
     this.applyDecay(state);
     state.successes += 1;
-    state.score = Math.min(1, state.score + reward);
+    state.score = Math.min(1, state.score + Math.max(0, Math.min(1, reward)));
     state.lastUpdate = Date.now();
     this.saveToDisk();
   }
@@ -97,7 +96,7 @@ export class TrustManager {
     const state = this.getOrCreateState(agentId);
     this.applyDecay(state);
     state.failures += 1;
-    state.score = Math.max(0, state.score - penalty);
+    state.score = Math.max(0, state.score - Math.max(0, Math.min(1, penalty)));
     state.lastUpdate = Date.now();
     this.saveToDisk();
   }
@@ -142,6 +141,39 @@ export class TrustManager {
     return Math.round((state.successes / total) * 1000) / 1000;
   }
 
+  private getPeerVerificationFailure(
+    peerId: string,
+    peerIdentity: AgentIdentity,
+  ): string | undefined {
+    if (!peerId) {
+      return 'Peer ID is required';
+    }
+
+    if (!peerIdentity.isActive()) {
+      return 'Peer identity is inactive or expired';
+    }
+
+    const didPrefix = `did:agentmesh:${peerId}:`;
+    if (!peerIdentity.did.startsWith(didPrefix)) {
+      return 'Peer identity DID does not match the claimed peer ID';
+    }
+
+    const didFingerprint = peerIdentity.did.slice(didPrefix.length);
+    if (!/^[0-9a-f]{16}$/i.test(didFingerprint)) {
+      return 'Peer identity DID fingerprint is invalid';
+    }
+
+    const expectedFingerprint = createHash('sha256')
+      .update(peerIdentity.publicKey)
+      .digest('hex')
+      .slice(0, 16);
+    if (didFingerprint !== expectedFingerprint) {
+      return 'Peer identity DID fingerprint does not match the public key';
+    }
+
+    return undefined;
+  }
+
   private saveToDisk(): void {
     if (!this.persistPath) return;
     try {
@@ -161,6 +193,10 @@ export class TrustManager {
       const raw = fs.readFileSync(this.persistPath, 'utf-8');
       const data = JSON.parse(raw) as Record<string, AgentTrustState>;
       for (const [key, value] of Object.entries(data)) {
+        // Clamp deserialized scores to valid [0, 1] range
+        if (typeof value.score === 'number') {
+          value.score = Math.max(0, Math.min(1, value.score));
+        }
         this.agents.set(key, value);
       }
     } catch {

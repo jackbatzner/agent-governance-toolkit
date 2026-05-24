@@ -34,12 +34,12 @@ Discover → Inventory → Reconcile → Govern
 ## Step 1: Install
 
 ```bash
-pip install agent-discovery
+pip install agentmesh_discovery
 ```
 
 For GitHub scanning:
 ```bash
-pip install agent-discovery[github]
+pip install agentmesh_discovery[github]
 ```
 
 ---
@@ -108,7 +108,7 @@ from agent_discovery import AgentInventory
 from agent_discovery.scanners import ProcessScanner, ConfigScanner
 
 async def main():
-    inventory = AgentInventory(storage_path="~/.agent-discovery/inventory.json")
+    inventory = AgentInventory(storage_path="~/.agent-governance-python/agent-discovery/inventory.json")
     
     # Run multiple scanners
     process_result = await ProcessScanner().scan()
@@ -251,7 +251,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Install agent-discovery
-        run: pip install agent-discovery[github]
+        run: pip install agentmesh_discovery[github]
       
       - name: Scan repository
         run: |
@@ -303,6 +303,6 @@ jobs:
 
 ## Related
 
-- [Agent Discovery README](../../packages/agent-discovery/README.md) — Full API reference
+- [Agent Discovery README](../../agent-governance-python/agent-discovery/README.md) — Full API reference
 - [Trust & Identity](02-trust-and-identity.md) — Register agents with AgentMesh
 - [Compliance Verification](18-compliance-verification.md) — Prove governance coverage

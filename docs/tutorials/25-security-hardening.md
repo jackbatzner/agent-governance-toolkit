@@ -13,7 +13,7 @@ branch protection — everything you need to secure a production agent system.
 
 ---
 
-## What you'll learn
+## What You'll Learn
 
 | Section | Topic |
 |---------|-------|
@@ -134,9 +134,9 @@ The toolkit uses Dependabot to monitor dependencies across **13 ecosystems**:
 
 | Ecosystem | Config File | Scope |
 |-----------|-------------|-------|
-| Python (pip) | `requirements/*.txt` | Core packages |
-| Python (pip) | `packages/*/requirements.txt` | Per-package |
-| Node.js (npm) | `packages/*/package.json` | TypeScript package |
+| Python (pip) | `agent-governance-python/requirements/*.txt` | Core packages |
+| Python (pip) | `*/requirements.txt` | Per-package |
+| Node.js (npm) | `*/package.json` | TypeScript package |
 | .NET (NuGet) | `*.csproj` | .NET package |
 | Rust (Cargo) | `Cargo.toml` | Rust crate |
 | Go (modules) | `go.mod` | Go module |
@@ -472,7 +472,7 @@ The toolkit includes a built-in security scanner for plugin directories:
 
 ```bash
 # Scan all packages with minimum severity of "high"
-python scripts/security_scan.py packages/ \
+python scripts/security_scan.py . \
   --exclude-tests \
   --min-severity high \
   --format text
@@ -528,6 +528,7 @@ For known false positives, create a `.security-exemptions.json`:
 | SBOM and signing | [Tutorial 26 — SBOM and Signing](./26-sbom-and-signing.md) |
 | MCP scan CLI | [Tutorial 27 — MCP Scan CLI](./27-mcp-scan-cli.md) |
 | Plugin marketplace security | [Tutorial 10 — Plugin Marketplace](./10-plugin-marketplace.md) |
+| Shift-left governance | [Tutorial 45 — Shift-Left Governance](./45-shift-left-governance.md) |
 
 ---
 

@@ -200,6 +200,35 @@ rules:
       expect(evalResult(engine, { user: { role: 'viewer' } }).allowed).toBe(false);
     });
 
+    it('does not split on ` or ` / ` and ` substrings inside string literals', () => {
+      // Before this guard, `String.split(' or ')` on the condition string
+      // sliced the literal `'foo or bar'` in half, the resulting fragments
+      // never matched any comparison branch, and the rule silently
+      // evaluated to deny.
+      const orEngine = makeEngine("name == 'foo or bar'");
+      expect(evalResult(orEngine, { name: 'foo or bar' }).allowed).toBe(true);
+      expect(evalResult(orEngine, { name: 'foo' }).allowed).toBe(false);
+
+      const andEngine = makeEngine("name == 'big and tall'");
+      expect(evalResult(andEngine, { name: 'big and tall' }).allowed).toBe(true);
+      expect(evalResult(andEngine, { name: 'big' }).allowed).toBe(false);
+
+      // Double-quoted literals get the same treatment.
+      const dqEngine = makeEngine('label == "ham or eggs"');
+      expect(evalResult(dqEngine, { label: 'ham or eggs' }).allowed).toBe(true);
+
+      // Mixed: a real out-of-quote `and` plus a literal ` or ` inside a string.
+      const mixedEngine = makeEngine(
+        "name == 'foo or bar' and role == 'admin'",
+      );
+      expect(
+        evalResult(mixedEngine, { name: 'foo or bar', role: 'admin' }).allowed,
+      ).toBe(true);
+      expect(
+        evalResult(mixedEngine, { name: 'foo or bar', role: 'user' }).allowed,
+      ).toBe(false);
+    });
+
     it('handles nested dot paths', () => {
       const engine = makeEngine("request.metadata.source == 'internal'");
       expect(evalResult(engine, { request: { metadata: { source: 'internal' } } }).allowed).toBe(true);
@@ -226,7 +255,7 @@ rules:
       expect(r1.allowed).toBe(true);
 
       const r2 = engine.evaluatePolicy('did:agentmesh:other:xyz', {});
-      expect(r2.allowed).toBe(true); // default allow (no applicable policies)
+      expect(r2.allowed).toBe(false); // fail closed when no policies apply
     });
 
     it('applies to agents list', () => {
@@ -239,7 +268,7 @@ rules:
 
       expect(engine.evaluatePolicy('did:agentmesh:a:1', {}).allowed).toBe(false);
       expect(engine.evaluatePolicy('did:agentmesh:b:2', {}).allowed).toBe(false);
-      expect(engine.evaluatePolicy('did:agentmesh:c:3', {}).allowed).toBe(true);
+      expect(engine.evaluatePolicy('did:agentmesh:c:3', {}).allowed).toBe(false);
     });
 
     it('wildcard agents applies to all', () => {

@@ -24,11 +24,11 @@ VENDOR_MODULES = {
 }
 
 CORE_PATHS = [
-    "packages/agent-os/src/agent_os",
-    "packages/agent-mesh/src/agentmesh",
-    "packages/agent-hypervisor/src/hypervisor",
-    "packages/agent-sre/src/agent_sre",
-    "packages/agent-compliance/src/agent_compliance",
+    "agent-governance-python/agent-os/src/agent_os",
+    "agent-governance-python/agent-mesh/src/agentmesh",
+    "agent-governance-python/agent-hypervisor/src/hypervisor",
+    "agent-governance-python/agent-sre/src/agent_sre",
+    "agent-governance-python/agent-compliance/src/agent_compliance",
 ]
 
 # Directories where vendor imports are expected (adapters, integrations)

@@ -32,7 +32,7 @@ jobs:
         run: |
           echo "Collecting package structure for OWASP analysis..."
           STRUCTURE=""
-          for pkg in packages/*/; do
+          for pkg in */; do
             if [ -d "$pkg/src" ]; then
               PKG_NAME=$(basename "$pkg")
               FILES=$(find "$pkg/src" -name "*.py" -type f | head -50 | sort)
@@ -46,9 +46,11 @@ jobs:
           "
             fi
           done
-          echo "structure<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$STRUCTURE" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "structure<<EOF"
+            echo "$STRUCTURE"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
           echo "Package structure collected."
 
       - name: Run OWASP compliance audit

@@ -13,7 +13,7 @@ echo "Copying docs to $SITE_DOCS..."
 mkdir -p "$SITE_DOCS"/{packages,tutorials,deployment,security,adr,reference}
 
 # Top-level docs
-cp QUICKSTART.md "$SITE_DOCS/quickstart.md"
+cp docs/QUICKSTART.md "$SITE_DOCS/quickstart.md"
 cp docs/ARCHITECTURE.md "$SITE_DOCS/architecture.md"
 cp docs/GLOSSARY.md "$SITE_DOCS/glossary.md"
 
@@ -42,8 +42,8 @@ cp CONTRIBUTING.md "$SITE_DOCS/reference/contributing.md"
 
 # Package READMEs
 for pkg in agent-os agent-mesh agent-runtime agent-sre agent-compliance agent-marketplace agent-lightning agent-hypervisor agent-os-vscode; do
-  if [ -f "packages/$pkg/README.md" ]; then
-    cp "packages/$pkg/README.md" "$SITE_DOCS/packages/$pkg.md"
+  if [ -f "$pkg/README.md" ]; then
+    cp "$pkg/README.md" "$SITE_DOCS/packages/$pkg.md"
   fi
 done
 

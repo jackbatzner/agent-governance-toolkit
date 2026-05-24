@@ -1,0 +1,5 @@
+streamlit==1.57.0
+plotly==5.24.1
+pandas==2.2.3
+agent-discovery==0.0.2
+agentmesh-platform==3.0.0

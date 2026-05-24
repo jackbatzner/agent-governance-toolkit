@@ -27,7 +27,7 @@
 > (LLM)的输入/输出，也不执行内容审核。它是在应用层对 *代理的行为* (工具调用、资源访问、
 > 代理间通信)进行治理。对于模型层面的安全，请参考[Azure AI Content Safety](https://learn.microsoft.com/azure/ai-services/content-safety/)。
 
-面向 AI 代理的运行时治理 — 唯一一个覆盖全部 **10 项 OWASP Agentic 风险** 并提供 **9,500+ 测试** 的工具包。 它治理的是代理 *做什么*, 而不仅仅是说什么 — 包括确定性策略执行、零信任身份认证、执行沙箱，以及站点可靠性工程(SRE) — 支持 **Python · TypeScript · .NET · Rust · Go**
+面向 AI 代理的运行时治理 — 唯一一个覆盖全部 **10 项 OWASP Agentic 风险** 并提供 **13,000+ 测试** 的工具包。 它治理的是代理 *做什么*, 而不仅仅是说什么 — 包括确定性策略执行、零信任身份认证、执行沙箱，以及站点可靠性工程(SRE) — 支持 **Python · TypeScript · .NET · Rust · Go**
 
 > **适用于任何技术栈** — 支持 AWS Bedrock, Google ADK, Azure AI, LangChain, CrewAI, AutoGen, OpenAI Agents, LlamaIndex 等。 只需通过 `pip install` 即可使用，无厂商锁定。
 
@@ -42,7 +42,7 @@ pip install agent-governance-toolkit[full]
 
 **TypeScript / Node.js** (npm)
 ```bash
-npm install @microsoft/agentmesh-sdk
+npm install @microsoft/agent-governance-sdk
 ```
 
 **.NET** (NuGet)
@@ -66,7 +66,7 @@ pip install agentmesh-lightning        # 强化学习训练治理
 
 ### 📚 文档
 
-- **[快速入门](../../QUICKSTART.md)** — 在 10 分钟内从零开始构建受治理的代理 (Python · TypeScript · .NET · Rust · Go)
+- **[快速入门](../../quickstart.md)** — 在 10 分钟内从零开始构建受治理的代理 (Python · TypeScript · .NET · Rust · Go)
 - **[TypeScript 包](../../agent-governance-typescript/README.md)** — 提供身份、信任、策略与审计功能的 npm 包
 - **[.NET 包](../../agent-governance-dotnet/README.md)** — 提供完整 OWASP 覆盖的 NuGet 包
 - **[Rust crate](../../agent-governance-rust/agentmesh/README.md)** — crates.io 上的库，包含策略、信任、审计及 Ed25519 身份
@@ -85,17 +85,17 @@ pip install agentmesh-lightning        # 强化学习训练治理
 ### ✨ **亮点**
 
 - **确定性策略执行**: 每个代理行为在执行 *前* 都会根据策略进行评估，延迟低于毫秒级 (<0.1 ms)
-  - [策略引擎](../../packages/agent-os/) | [性能基准](../../BENCHMARKS.md)
+  - [策略引擎](../../agent-governance-python/agent-os/) | [性能基准](../../BENCHMARKS.md)
 - **零信任代理身份**: 基于 Ed25519 的加密凭证，支持 SPIFFE/SVID，信任评分范围为 0–1000 
-  - [AgentMesh](../../packages/agent-mesh/) | [信任评分](../../packages/agent-mesh/)
+  - [AgentMesh](../../agent-governance-python/agent-mesh/) | [信任评分](../../agent-governance-python/agent-mesh/)
 - **执行沙箱**: 4 层权限环、Saga 编排、终止控制与紧急停止(kill switch)
-  - [Agent Runtime](../../packages/agent-runtime/) | [代理虚拟化管理器](../../packages/agent-hypervisor/)
+  - [Agent Runtime](../../agent-governance-python/agent-runtime/) | [代理虚拟化管理器](../../agent-governance-python/agent-hypervisor/)
 - **代理 SRE**: 包含 SLO、错误预算、回放调试、混沌工程、熔断机制与渐进式发布
-  - [Agent SRE](../../packages/agent-sre/) | [可观测性集成](../../packages/agent-hypervisor/src/hypervisor/observability/)
+  - [Agent SRE](../../agent-governance-python/agent-sre/) | [可观测性集成](../../agent-governance-python/agent-hypervisor/src/hypervisor/observability/)
 - **MCP 安全扫描器**: 检测 MCP 工具定义中的工具投毒、拼写劫持(typosquatting)、隐藏指令与rug-pull攻击
-  - [MCP 扫描器](../../packages/agent-os/src/agentos/mcp_security.py) | [CLI](../../packages/agent-os/src/agentos/cli/mcp_scan.py)
+  - [MCP 扫描器](../../agent-governance-python/agent-os/src/agentos/mcp_security.py) | [CLI](../../agent-governance-python/agent-os/src/agentos/cli/mcp_scan.py)
 - **信任报告 CLI**: `agentmesh trust report` — 可视化信任评分、任务成功/失败情况及代理活动
-  - [信任 CLI](../../packages/agent-mesh/src/agentmesh/cli/trust_cli.py)
+  - [信任 CLI](../../agent-governance-python/agent-mesh/src/agentmesh/cli/trust_cli.py)
 - **密钥扫描与模糊测试**: 基于 Gitleaks 的工作流，包含 7 个模糊测试目标，覆盖策略、注入、沙箱、信任及 MCP
   - [安全工作流](../../.github/workflows/)
 - **12+ 框架集成**: 支持 Microsoft Agent Framework, LangChain, CrewAI, AutoGen, Dify, LlamaIndex, OpenAI Agents, Google ADK 等
@@ -135,7 +135,7 @@ if decision.allowed:
 ### 执行策略 — TypeScript
 
 ```typescript
-import { PolicyEngine } from "@microsoft/agentmesh-sdk";
+import { PolicyEngine } from "@microsoft/agent-governance-sdk";
 
 const engine = new PolicyEngine([
   { action: "web_search", effect: "allow" },
@@ -194,10 +194,10 @@ result := client.ExecuteWithGovernance("data.read", nil)
 
 ```bash
 # 完整治理演示 (policy enforcement, audit, trust, cost, reliability)
-python demo/maf_governance_demo.py
+python examples/demos/maf_governance_demo.py
 
 # 使用对抗性攻击场景运行
-python demo/maf_governance_demo.py --include-attacks
+python examples/demos/maf_governance_demo.py --include-attacks
 ```
 
 ## 更多示例与样本
@@ -267,7 +267,7 @@ decision = engine.evaluate("did:mesh:agent-1", {"tool_name": "analyze"})
 | 语言 | Package | Install |
 |----------|---------|---------|
 | **Python** | [`agent-governance-toolkit[full]`](https://pypi.org/project/agent-governance-toolkit/) | `pip install agent-governance-toolkit[full]` |
-| **TypeScript** | [`@microsoft/agentmesh-sdk`](../../agent-governance-typescript/) | `npm install @microsoft/agentmesh-sdk` |
+| **TypeScript** | [`@microsoft/agent-governance-sdk`](../../agent-governance-typescript/) | `npm install @microsoft/agent-governance-sdk` |
 | **.NET** | [`Microsoft.AgentGovernance`](https://www.nuget.org/packages/Microsoft.AgentGovernance) | `dotnet add package Microsoft.AgentGovernance` |
 | **Rust** | [`agentmesh`](https://crates.io/crates/agentmesh) | `cargo add agentmesh` |
 | **Go** | [`agentmesh`](../../agent-governance-golang/) | `go get github.com/microsoft/agent-governance-toolkit/agent-governance-golang` |
@@ -278,11 +278,11 @@ decision = engine.evaluate("did:mesh:agent-1", {"tool_name": "analyze"})
 |---------|------|-------------|
 | **Agent OS** | [`agent-os-kernel`](https://pypi.org/project/agent-os-kernel/) | 策略引擎 — 确定性动作评估、能力模型、审计日志、动作拦截、MCP 网关 |
 | **AgentMesh** | [`agentmesh-platform`](https://pypi.org/project/agentmesh-platform/) | 代理间信任 — Ed25519 身份、SPIFFE/SVID 凭证、信任评分、A2A/MCP/IATP 协议桥接 |
-| **Agent Runtime** | [`agentmesh-runtime`](../../packages/agent-runtime/) | 执行监督器 — 四层权限环、 saga 编排 、终止控制、联合责任、仅追加审计日志 |
-| **Agent SRE** | [`agent-sre`](https://pypi.org/project/agent-sre/) | 可靠性工程 — SLOs、错误预算、重放调试、混沌工程、渐进式发布 |
+| **Agent Runtime** | [`agentmesh-runtime`](../../agent-governance-python/agent-runtime/) | 执行监督器 — 四层权限环、 saga 编排 、终止控制、联合责任、仅追加审计日志 |
+| **Agent SRE** | [`agent-sre`](https://pypi.org/project/agent-governance-python/agent-sre/) | 可靠性工程 — SLOs、错误预算、重放调试、混沌工程、渐进式发布 |
 | **Agent Compliance** | [`agent-governance-toolkit`](https://pypi.org/project/agent-governance-toolkit/) | 运行时策略执行 — OWASP ASI 2026 控制、治理证明、完整性验证 |
-| **Agent Marketplace** | [`agentmesh-marketplace`](../../packages/agent-marketplace/) | 插件生命周期 — 发现、安装、验证和签名插件 |
-| **Agent Lightning** | [`agentmesh-lightning`](../../packages/agent-lightning/) | RL 训练治理 — 受治理运行器、策略奖励 |
+| **Agent Marketplace** | [`agentmesh-marketplace`](../../agent-governance-python/agent-marketplace/) | 插件生命周期 — 发现、安装、验证和签名插件 |
+| **Agent Lightning** | [`agentmesh-lightning`](../../agent-governance-python/agent-lightning/) | RL 训练治理 — 受治理运行器、策略奖励 |
 
 ## 框架集成
 
@@ -309,8 +309,8 @@ decision = engine.evaluate("did:mesh:agent-1", {"tool_name": "analyze"})
 | 代理目标劫持 | ASI-01 | ✅ 策略引擎阻止未授权的目标更改 |
 | 过度能力 | ASI-02 | ✅ 能力模型强制最小权限原则 |
 | 身份与权限滥用 | ASI-03 | ✅ 基于 Ed25519 证书的零信任身份 |
-| 不受控代码执行 | ASI-04 | ✅ Agent Runtime 执行环 + 沙箱 |
-| 不安全输出处理 | ASI-05 | ✅ 内容策略验证所有输出 |
+| 代理供应链攻击 | ASI-04 | ✅ 依赖混淆扫描 + 工具验证 |
+| 意外代码执行 | ASI-05 | ✅ Agent Runtime 执行环 + 沙箱 |
 | 内存投毒 | ASI-06 | ✅ 带完整性检查的情节记忆 |
 | 不安全的代理间通信 | ASI-07 | ✅ AgentMesh 加密通道 + 信任门控 |
 | 级联故障 | ASI-08 | ✅ 断路器 + SLO 执行 |

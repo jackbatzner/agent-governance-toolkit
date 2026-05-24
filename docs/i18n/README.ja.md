@@ -34,7 +34,7 @@
 > ガバナンスします。モデルレベルの安全性については、
 > [Azure AI Content Safety](https://learn.microsoft.com/azure/ai-services/content-safety/) をご参照ください。
 
-AI エージェントのためのランタイムガバナンス — **OWASP Agentic リスク全10項目**を **9,500 以上のテスト**でカバーする唯一のツールキット。エージェントが*何を言うか*ではなく、*何をするか*をガバナンス — 決定論的ポリシー適用、ゼロトラストID、実行サンドボックス、SRE — **Python · TypeScript · .NET · Rust · Go**
+AI エージェントのためのランタイムガバナンス — **OWASP Agentic リスク全10項目**を **13,000 以上のテスト**でカバーする唯一のツールキット。エージェントが*何を言うか*ではなく、*何をするか*をガバナンス — 決定論的ポリシー適用、ゼロトラストID、実行サンドボックス、SRE — **Python · TypeScript · .NET · Rust · Go**
 
 > **あらゆるスタックに対応** — AWS Bedrock、Google ADK、Azure AI、LangChain、CrewAI、AutoGen、OpenAI Agents、LlamaIndex など。`pip install` のみでベンダーロックインなし。
 
@@ -49,7 +49,7 @@ pip install agent-governance-toolkit[full]
 
 **TypeScript / Node.js** (npm)
 ```bash
-npm install @microsoft/agentmesh-sdk
+npm install @microsoft/agent-governance-sdk
 ```
 
 **.NET** (NuGet)
@@ -83,7 +83,7 @@ pip install agentmesh-lightning        # 強化学習トレーニングガバナ
 
 ### 📚 ドキュメント
 
-- **[クイックスタート](../../QUICKSTART.md)** — ゼロからガバナンス付きエージェントを10分で構築（Python · TypeScript · .NET · Rust · Go）
+- **[クイックスタート](../../quickstart.md)** — ゼロからガバナンス付きエージェントを10分で構築（Python · TypeScript · .NET · Rust · Go）
 - **[TypeScript パッケージ](../../agent-governance-typescript/README.md)** — ID、トラスト、ポリシー、監査機能を備えた npm パッケージ
 - **[.NET パッケージ](../../agent-governance-dotnet/README.md)** — 完全な OWASP カバレッジを備えた NuGet パッケージ
 - **[Rust クレート](../../agent-governance-rust/agentmesh/README.md)** — ポリシー、トラスト、監査、ID、MCP ガバナンスプリミティブを備えた crates.io クレート
@@ -103,17 +103,17 @@ pip install agentmesh-lightning        # 強化学習トレーニングガバナ
 ### ✨ **ハイライト**
 
 - **決定論的ポリシー適用**: すべてのエージェントアクションが実行*前*にポリシーに基づいて評価され、サブミリ秒のレイテンシ（<0.1 ms）で処理
-  - [ポリシーエンジン](../../packages/agent-os/) | [ベンチマーク](../../BENCHMARKS.md)
+  - [ポリシーエンジン](../../agent-governance-python/agent-os/) | [ベンチマーク](../../BENCHMARKS.md)
 - **ゼロトラストエージェントID**: Ed25519 暗号資格情報、SPIFFE/SVID サポート、0〜1000 スケールのトラストスコアリング
-  - [AgentMesh](../../packages/agent-mesh/) | [トラストスコアリング](../../packages/agent-mesh/)
+  - [AgentMesh](../../agent-governance-python/agent-mesh/) | [トラストスコアリング](../../agent-governance-python/agent-mesh/)
 - **実行サンドボックス**: 4 階層の特権リング、Saga オーケストレーション、終了制御、キルスイッチ
-  - [Agent Runtime](../../packages/agent-runtime/) | [Agent Hypervisor](../../packages/agent-hypervisor/)
+  - [Agent Runtime](../../agent-governance-python/agent-runtime/) | [Agent Hypervisor](../../agent-governance-python/agent-hypervisor/)
 - **エージェント SRE**: SLO、エラーバジェット、リプレイデバッグ、カオスエンジニアリング、サーキットブレーカー、プログレッシブデリバリー
-  - [Agent SRE](../../packages/agent-sre/) | [オブザーバビリティ統合](../../packages/agent-hypervisor/src/hypervisor/observability/)
+  - [Agent SRE](../../agent-governance-python/agent-sre/) | [オブザーバビリティ統合](../../agent-governance-python/agent-hypervisor/src/hypervisor/observability/)
 - **MCP セキュリティスキャナー**: MCP ツール定義におけるツールポイズニング、タイポスクワッティング、隠し命令、ラグプル攻撃を検出
-  - [MCP スキャナー](../../packages/agent-os/src/agentos/mcp_security.py) | [CLI](../../packages/agent-os/src/agentos/cli/mcp_scan.py)
+  - [MCP スキャナー](../../agent-governance-python/agent-os/src/agentos/mcp_security.py) | [CLI](../../agent-governance-python/agent-os/src/agentos/cli/mcp_scan.py)
 - **トラストレポート CLI**: `agentmesh trust report` — トラストスコア、タスクの成功/失敗、エージェントアクティビティを可視化
-  - [トラスト CLI](../../packages/agent-mesh/src/agentmesh/cli/trust_cli.py)
+  - [トラスト CLI](../../agent-governance-python/agent-mesh/src/agentmesh/cli/trust_cli.py)
 - **シークレットスキャンとファジング**: Gitleaks ワークフロー、ポリシー・インジェクション・サンドボックス・トラスト・MCP をカバーする7つのファズターゲット
   - [セキュリティワークフロー](../../.github/workflows/)
 - **12 以上のフレームワーク統合**: Microsoft Agent Framework、LangChain、CrewAI、AutoGen、Dify、LlamaIndex、OpenAI Agents、Google ADK など
@@ -153,7 +153,7 @@ if decision.allowed:
 ### ポリシーの適用 — TypeScript
 
 ```typescript
-import { PolicyEngine } from "@microsoft/agentmesh-sdk";
+import { PolicyEngine } from "@microsoft/agent-governance-sdk";
 
 const engine = new PolicyEngine([
   { action: "web_search", effect: "allow" },
@@ -212,10 +212,10 @@ result := client.ExecuteWithGovernance("data.read", nil)
 
 ```bash
 # フルガバナンスデモ（ポリシー適用、監査、トラスト、コスト、信頼性）
-python demo/maf_governance_demo.py
+python examples/demos/maf_governance_demo.py
 
 # 敵対的攻撃シナリオを含めて実行
-python demo/maf_governance_demo.py --include-attacks
+python examples/demos/maf_governance_demo.py --include-attacks
 ```
 
 ## その他のサンプルと例
@@ -285,7 +285,7 @@ decision = engine.evaluate("did:mesh:agent-1", {"tool_name": "analyze"})
 | 言語 | パッケージ | インストール |
 |----------|---------|---------|
 | **Python** | [`agent-governance-toolkit[full]`](https://pypi.org/project/agent-governance-toolkit/) | `pip install agent-governance-toolkit[full]` |
-| **TypeScript** | [`@microsoft/agentmesh-sdk`](../../agent-governance-typescript/) | `npm install @microsoft/agentmesh-sdk` |
+| **TypeScript** | [`@microsoft/agent-governance-sdk`](../../agent-governance-typescript/) | `npm install @microsoft/agent-governance-sdk` |
 | **.NET** | [`Microsoft.AgentGovernance`](https://www.nuget.org/packages/Microsoft.AgentGovernance) | `dotnet add package Microsoft.AgentGovernance` |
 | **Rust** | [`agentmesh`](https://crates.io/crates/agentmesh) | `cargo add agentmesh` |
 | **Rust MCP** | [`agentmesh-mcp`](https://crates.io/crates/agentmesh-mcp) | `cargo add agentmesh-mcp` |
@@ -297,11 +297,11 @@ decision = engine.evaluate("did:mesh:agent-1", {"tool_name": "analyze"})
 |---------|------|-------------|
 | **Agent OS** | [`agent-os-kernel`](https://pypi.org/project/agent-os-kernel/) | ポリシーエンジン — 決定論的アクション評価、ケイパビリティモデル、監査ログ、アクションインターセプション、MCP ゲートウェイ |
 | **AgentMesh** | [`agentmesh-platform`](https://pypi.org/project/agentmesh-platform/) | エージェント間トラスト — Ed25519 ID、SPIFFE/SVID 資格情報、トラストスコアリング、A2A/MCP/IATP プロトコルブリッジ |
-| **Agent Runtime** | [`agentmesh-runtime`](../../packages/agent-runtime/) | 実行スーパーバイザー — 4 階層特権リング、Saga オーケストレーション、終了制御、連帯責任、追記専用監査ログ |
-| **Agent SRE** | [`agent-sre`](https://pypi.org/project/agent-sre/) | 信頼性エンジニアリング — SLO、エラーバジェット、リプレイデバッグ、カオスエンジニアリング、プログレッシブデリバリー |
+| **Agent Runtime** | [`agentmesh-runtime`](../../agent-governance-python/agent-runtime/) | 実行スーパーバイザー — 4 階層特権リング、Saga オーケストレーション、終了制御、連帯責任、追記専用監査ログ |
+| **Agent SRE** | [`agent-sre`](https://pypi.org/project/agent-governance-python/agent-sre/) | 信頼性エンジニアリング — SLO、エラーバジェット、リプレイデバッグ、カオスエンジニアリング、プログレッシブデリバリー |
 | **Agent Compliance** | [`agent-governance-toolkit`](https://pypi.org/project/agent-governance-toolkit/) | ランタイムポリシー適用 — OWASP ASI 2026 コントロール、ガバナンスアテステーション、完全性検証 |
-| **Agent Marketplace** | [`agentmesh-marketplace`](../../packages/agent-marketplace/) | プラグインライフサイクル — プラグインの検出、インストール、検証、署名 |
-| **Agent Lightning** | [`agentmesh-lightning`](../../packages/agent-lightning/) | 強化学習トレーニングガバナンス — ガバナンス付きランナー、ポリシー報酬 |
+| **Agent Marketplace** | [`agentmesh-marketplace`](../../agent-governance-python/agent-marketplace/) | プラグインライフサイクル — プラグインの検出、インストール、検証、署名 |
+| **Agent Lightning** | [`agentmesh-lightning`](../../agent-governance-python/agent-lightning/) | 強化学習トレーニングガバナンス — ガバナンス付きランナー、ポリシー報酬 |
 
 ## フレームワーク統合
 
@@ -328,8 +328,8 @@ decision = engine.evaluate("did:mesh:agent-1", {"tool_name": "analyze"})
 | エージェント目標ハイジャック | ASI-01 | ✅ ポリシーエンジンが未承認の目標変更をブロック |
 | 過剰なケイパビリティ | ASI-02 | ✅ ケイパビリティモデルが最小権限を適用 |
 | ID と特権の悪用 | ASI-03 | ✅ Ed25519 証明書によるゼロトラスト ID |
-| 制御されないコード実行 | ASI-04 | ✅ Agent Runtime 実行リング + サンドボックス |
-| 安全でない出力処理 | ASI-05 | ✅ コンテンツポリシーがすべての出力を検証 |
+| エージェントサプライチェーン侵害 | ASI-04 | ✅ 依存関係混乱スキャン + ツール検証 |
+| 予期しないコード実行 | ASI-05 | ✅ Agent Runtime 実行リング + サンドボックス |
 | メモリポイズニング | ASI-06 | ✅ 完全性チェック付きエピソディックメモリ |
 | 安全でないエージェント間通信 | ASI-07 | ✅ AgentMesh 暗号化チャネル + トラストゲート |
 | カスケード障害 | ASI-08 | ✅ サーキットブレーカー + SLO 適用 |

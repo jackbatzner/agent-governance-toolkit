@@ -145,6 +145,52 @@ describe("X3DHKeyManager", () => {
       bob.respond(alice.identityKey.publicKey, result.ephemeralPublicKey, 0),
     ).toThrow("not found or already consumed");
   });
+
+  test("bundle includes Ed25519 identity key", () => {
+    const mgr = makeManager();
+    mgr.generateSignedPreKey();
+    const bundle = mgr.getPublicBundle();
+    expect(bundle.identityKeyEd).toBeDefined();
+    expect(bundle.identityKeyEd!.length).toBe(32);
+  });
+
+  test("valid signature passes verification", () => {
+    const alice = makeManager();
+    const bob = makeManager();
+    bob.generateSignedPreKey();
+    const bundle = bob.getPublicBundle();
+    expect(() => alice.initiate(bundle)).not.toThrow();
+  });
+
+  test("tampered signed pre-key rejected", () => {
+    const alice = makeManager();
+    const bob = makeManager();
+    bob.generateSignedPreKey();
+    const bundle = bob.getPublicBundle();
+    const tampered = { ...bundle, signedPreKey: new Uint8Array(bundle.signedPreKey) };
+    tampered.signedPreKey[0] ^= 0xff;
+    expect(() => alice.initiate(tampered)).toThrow("Signed pre-key signature verification FAILED");
+  });
+
+  test("forged identity key rejected", () => {
+    const alice = makeManager();
+    const bob = makeManager();
+    bob.generateSignedPreKey();
+    const bundle = bob.getPublicBundle();
+    const attackerPriv = ed25519.utils.randomSecretKey();
+    const attackerPub = ed25519.getPublicKey(attackerPriv);
+    const forged = { ...bundle, identityKeyEd: attackerPub };
+    expect(() => alice.initiate(forged)).toThrow("Signed pre-key signature verification FAILED");
+  });
+
+  test("missing identityKeyEd throws (fail-closed)", () => {
+    const alice = makeManager();
+    const bob = makeManager();
+    bob.generateSignedPreKey();
+    const bundle = bob.getPublicBundle();
+    delete (bundle as any).identityKeyEd;
+    expect(() => alice.initiate(bundle)).toThrow("Missing or invalid Ed25519 identity key (identityKeyEd)");
+  });
 });
 
 // ── Double Ratchet ──
@@ -235,6 +281,49 @@ describe("DoubleRatchet", () => {
     const e4 = aRatchet.encrypt(enc.encode("msg4"));
 
     expect(() => bLimited.decrypt(e4)).toThrow("Too many skipped");
+  });
+
+  test("skippedKeys cache is bounded by the aggregate cap", () => {
+    // The per-chain cap (maxSkip) bounds a single burst; the global cap
+    // bounds the lifetime accumulation across DH ratchet steps. This
+    // test forces a single oversized burst within one chain by raising
+    // maxSkip well above the global cap and confirms the resulting
+    // skippedKeys map never exceeds it (oldest entries are evicted FIFO).
+    const MAX_TOTAL = 2000;
+    const OVERFLOW = 50;
+    const SKIP = MAX_TOTAL + OVERFLOW;
+
+    const alice = makeManager();
+    const bob = makeManager();
+    bob.generateSignedPreKey();
+    bob.generateOneTimePreKeys(1);
+    const bundle = bob.getPublicBundle(0);
+    const ar = alice.initiate(bundle);
+    const br = bob.respond(alice.identityKey.publicKey, ar.ephemeralPublicKey, 0);
+
+    const aRatchet = DoubleRatchet.initSender(ar.sharedSecret, bundle.signedPreKey);
+    const bRatchetRaw = DoubleRatchet.initReceiver(br.sharedSecret, {
+      privateKey: bob.signedPreKey!.keyPair.privateKey,
+      publicKey: bob.signedPreKey!.keyPair.publicKey,
+    });
+
+    // Rebuild bob with a generous per-chain cap so the burst itself is
+    // not rejected, leaving the global cap as the only thing protecting
+    // memory.
+    const bRatchet = DoubleRatchet.fromState(bRatchetRaw.getState(), SKIP + 1);
+
+    // Alice sends SKIP messages that bob will skip, then one we deliver.
+    for (let i = 0; i < SKIP; i++) {
+      aRatchet.encrypt(enc.encode(`skipped-${i}`));
+    }
+    const final = aRatchet.encrypt(enc.encode("delivered"));
+
+    expect(dec.decode(bRatchet.decrypt(final))).toBe("delivered");
+
+    // After processing the final message, exactly MAX_TOTAL skipped keys
+    // remain cached; the oldest OVERFLOW were evicted.
+    const cachedAfter = bRatchet.getState().skippedKeys.size;
+    expect(cachedAfter).toBe(MAX_TOTAL);
   });
 });
 

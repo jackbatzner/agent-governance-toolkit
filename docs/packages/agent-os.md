@@ -33,9 +33,9 @@
 <p align="center">
   <a href="https://github.com/langgenius/dify-plugins/pull/2060"><img src="https://img.shields.io/badge/Dify-Merged-success?style=flat-square" alt="Dify"></a>
   <a href="https://github.com/run-llama/llama_index/pull/20644"><img src="https://img.shields.io/badge/LlamaIndex-Merged-success?style=flat-square" alt="LlamaIndex"></a>
-  <a href="https://github.com/microsoft/agent-lightning/pull/478"><img src="https://img.shields.io/badge/Agent--Lightning-Merged-success?style=flat-square" alt="Agent-Lightning"></a>
+  <a href="https://github.com/microsoft/agent-governance-python/agent-lightning/pull/478"><img src="https://img.shields.io/badge/Agent--Lightning-Merged-success?style=flat-square" alt="Agent-Lightning"></a>
   <a href="https://pypi.org/project/langgraph-trust/"><img src="https://img.shields.io/badge/LangGraph-PyPI-blue?style=flat-square" alt="LangGraph"></a>
-  <a href="https://pypi.org/project/openai-agents-trust/"><img src="https://img.shields.io/badge/OpenAI_Agents-PyPI-blue?style=flat-square" alt="OpenAI Agents"></a>
+  <a href="https://pypi.org/project/agentmesh-openai-agents-trust/"><img src="https://img.shields.io/badge/OpenAI_Agents-PyPI-blue?style=flat-square" alt="OpenAI Agents"></a>
   <a href="https://clawhub.ai/microsoft/agentmesh-governance"><img src="https://img.shields.io/badge/OpenClaw-ClawHub-purple?style=flat-square" alt="OpenClaw"></a>
 </p>
 
@@ -48,7 +48,7 @@
   <a href="https://github.com/heilcheng/awesome-agent-skills/pull/34"><img src="https://img.shields.io/badge/awesome--agent--skills-listed-orange?style=flat-square" alt="awesome-agent-skills"></a>
   <a href="https://github.com/TensorBlock/awesome-mcp-servers/pull/66"><img src="https://img.shields.io/badge/awesome--mcp--servers-listed-orange?style=flat-square" alt="awesome-mcp-servers"></a>
   <a href="https://github.com/rohitg00/awesome-devops-mcp-servers/pull/27"><img src="https://img.shields.io/badge/awesome--devops--mcp-listed-orange?style=flat-square" alt="awesome-devops-mcp"></a>
-</p>across 170K+ GitHub stars. Governance for [Dify](https://github.com/langgenius/dify-plugins/pull/2060) (65K ⭐), [LlamaIndex](https://github.com/run-llama/llama_index/pull/20644) (47K ⭐), [LangGraph](https://pypi.org/project/langgraph-trust/), [OpenAI Agents](https://pypi.org/project/openai-agents-trust/), [Agent-Lightning](https://github.com/microsoft/agent-lightning/pull/478), and [OpenClaw](https://clawhub.ai/microsoft/agentmesh-governance).
+</p>across 170K+ GitHub stars. Governance for [Dify](https://github.com/langgenius/dify-plugins/pull/2060) (65K ⭐), [LlamaIndex](https://github.com/run-llama/llama_index/pull/20644) (47K ⭐), [LangGraph](https://pypi.org/project/langgraph-trust/), [OpenAI Agents](https://pypi.org/project/agentmesh-openai-agents-trust/), [Agent-Lightning](https://github.com/microsoft/agent-governance-python/agent-lightning/pull/478), and [OpenClaw](https://clawhub.ai/microsoft/agentmesh-governance).
 
 ## 📊 By The Numbers
 
@@ -57,7 +57,7 @@
 <td align="center"><h3>2,573+</h3><sub>Tests Passing</sub></td>
 <td align="center"><h3>12</h3><sub>Framework Integrations</sub></td>
 <td align="center"><h3>170K+</h3><sub>Combined Stars of<br/>Integrated Projects</sub></td>
-<td align="center"><h3>&lt;0.1ms p99</h3><sub>Governance Latency<br/><a href="benchmarks/results/BENCHMARKS.md">Benchmarks</a></sub></td>
+<td align="center"><h3>&lt;0.1ms p99</h3><sub>Governance Latency<br/><a href="agent-governance-python/benchmarks/results/BENCHMARKS.md">Benchmarks</a></sub></td>
 <td align="center"><h3>9</h3><sub>More Framework Proposals<br/>Under Review</sub></td>
 </tr>
 </table>
@@ -68,9 +68,9 @@
 |-----------|-------|--------|------|
 | **Dify** | 65K ⭐ | ✅ Merged | [dify-plugins#2060](https://github.com/langgenius/dify-plugins/pull/2060) |
 | **LlamaIndex** | 47K ⭐ | ✅ Merged | [llama_index#20644](https://github.com/run-llama/llama_index/pull/20644) |
-| **Microsoft Agent-Lightning** | 15K ⭐ | ✅ Merged | [agent-lightning#478](https://github.com/microsoft/agent-lightning/pull/478) |
+| **Microsoft Agent-Lightning** | 15K ⭐ | ✅ Merged | [agent-lightning#478](https://github.com/microsoft/agent-governance-python/agent-lightning/pull/478) |
 | **LangGraph** | 24K ⭐ | 📦 Published on PyPI | [langgraph-trust](https://pypi.org/project/langgraph-trust/) |
-| **OpenAI Agents SDK** | — | 📦 Published on PyPI | [openai-agents-trust](https://pypi.org/project/openai-agents-trust/) |
+| **OpenAI Agents SDK** | — | 📦 Published on PyPI | [agentmesh-openai-agents-trust](https://pypi.org/project/agentmesh-openai-agents-trust/) |
 | **OpenClaw** | — | 📦 Published on ClawHub | [agentmesh-governance](https://clawhub.ai/microsoft/agentmesh-governance) |
 
 <details>
@@ -123,9 +123,9 @@ Agent OS + ecosystem covers **10 out of 10** [OWASP Agentic Application Security
 | ASI03 Identity & Privilege | ✅ Full | `require_human_approval`, RBAC policies |
 | ASI04 Supply Chain | ✅ Full | AI-BOM v2.0 — model + data + weights provenance |
 | ASI05 Code Execution | ✅ Full | `blocked_patterns`, sandbox integration |
-| ASI06 Memory Poisoning | ✅ Full | `MemoryGuard` — hash integrity, injection detection |
+| ASI06 Memory & Context Poisoning | ✅ Full | `MemoryGuard` — hash integrity, injection detection |
 | ASI07 Inter-Agent Comms | ✅ Full | AgentMesh trust handshake, HMAC auth |
-| ASI08 Cascading Failures | ✅ Full | Agent SRE circuit breakers, cascade detection |
+| ASI08 Cascading Agent Failures | ✅ Full | Agent SRE circuit breakers, cascade detection |
 | ASI09 Human-Agent Trust | ✅ Full | Human approval workflows, audit logging |
 | ASI10 Rogue Agents | ✅ Full | Agent Runtime kill switch + ring isolation |
 
@@ -175,7 +175,7 @@ That's it! Your agent now has deterministic policy enforcement. [Learn more →]
 
 **🎬 See all features in action:**
 ```bash
-git clone https://github.com/microsoft/agent-governance-toolkit && cd agent-governance-toolkit && pip install -e packages/agent-os && python demo/maf_governance_demo.py
+git clone https://github.com/microsoft/agent-governance-toolkit && cd agent-governance-toolkit && pip install -e agent-os && python examples/demos/maf_governance_demo.py
 ```
 
 <details>
@@ -362,7 +362,7 @@ graph TB
 ### Directory Structure
 
 ```
-agent-os/
+agent-governance-python/agent-os/
 ├── src/agent_os/             # Core Python package
 │   ├── __init__.py           # Public API (re-exports from all layers)
 │   ├── stateless.py          # StatelessKernel (zero-dependency core)
@@ -395,7 +395,7 @@ agent-os/
 ├── examples/                 # Working examples
 ├── docs/                     # Documentation
 ├── tests/                    # Test suite (organized by layer)
-├── notebooks/                # Jupyter tutorials
+├── agent-governance-python/notebooks/                # Jupyter tutorials
 ├── papers/                   # Research papers
 └── templates/                # Policy templates
 ```
@@ -500,7 +500,7 @@ summary_hash = await rt.terminate_session(session.sso.session_id)
 | Extension | Description | Status |
 |-----------|-------------|--------|
 | [`mcp-server`](extensions/mcp-server/) | ⭐ **MCP Server** — Works with Claude, Copilot, Cursor (`npx agentos-mcp-server`) | ✅ Published (v1.0.1) |
-| [`vscode`](../../agent-os-vscode/) | VS Code extension with real-time policy checks, enterprise features | ✅ Published (v1.0.1) |
+| [`vscode`](../../agent-governance-typescript/agent-os-vscode/) | VS Code extension with real-time policy checks, enterprise features | ✅ Published (v1.0.1) |
 | [`copilot`](extensions/copilot/) | GitHub Copilot extension (Vercel/Docker deployment) | ✅ Published |
 | [`jetbrains`](extensions/jetbrains/) | IntelliJ, PyCharm, WebStorm plugin (Kotlin) | ✅ Built |
 | [`cursor`](extensions/cursor/) | Cursor IDE extension (Composer integration) | ✅ Built (v0.1.0) |
@@ -923,12 +923,12 @@ See [MCP server documentation](extensions/mcp-server/README.md) for full details
 
 | Notebook | Description | Time |
 |----------|-------------|------|
-| [Hello Agent OS](notebooks/01-hello-agent-os.ipynb) | Your first governed agent | 5 min |
-| [Episodic Memory](notebooks/02-episodic-memory-demo.ipynb) | Agent memory that persists | 15 min |
-| [Time-Travel Debugging](notebooks/03-time-travel-debugging.ipynb) | Replay and debug decisions | 20 min |
-| [Verification](notebooks/04-verification.ipynb) | Detect hallucinations | 15 min |
-| [Multi-Agent Coordination](notebooks/05-multi-agent-coordination.ipynb) | Trust between agents | 20 min |
-| [Policy Engine](notebooks/06-policy-engine.ipynb) | Deep dive into policies | 15 min |
+| [Hello Agent OS](agent-governance-python/notebooks/01-hello-agent-os.ipynb) | Your first governed agent | 5 min |
+| [Episodic Memory](agent-governance-python/notebooks/02-episodic-memory-demo.ipynb) | Agent memory that persists | 15 min |
+| [Time-Travel Debugging](agent-governance-python/notebooks/03-time-travel-debugging.ipynb) | Replay and debug decisions | 20 min |
+| [Verification](agent-governance-python/notebooks/04-verification.ipynb) | Detect hallucinations | 15 min |
+| [Multi-Agent Coordination](agent-governance-python/notebooks/05-multi-agent-coordination.ipynb) | Trust between agents | 20 min |
+| [Policy Engine](agent-governance-python/notebooks/06-policy-engine.ipynb) | Deep dive into policies | 15 min |
 
 ### Reference
 - [Quickstart Guide](docs/quickstart.md) — 60 seconds to first agent
@@ -1138,7 +1138,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 Prompt-based guardrails ask the LLM to self-police, which is probabilistic. Agent OS enforces governance at the middleware level using deterministic policy engines and POSIX-inspired access controls. It controls what agents *can* do (capability-based), not just what they *should not* do (filter-based).
 
 **How does Agent OS work with other frameworks?**
-Agent OS integrates with 14+ frameworks via adapters. Install the governance layer alongside your existing framework: use `langgraph-trust` for LangGraph, `openai-agents-trust` for OpenAI Agents, or the MCP server for any MCP-compatible client. Agent OS acts as a kernel layer underneath your agent framework.
+Agent OS integrates with 14+ frameworks via adapters. Install the governance layer alongside your existing framework: use `langgraph-trust` for LangGraph, `agentmesh-openai-agents-trust` for OpenAI Agents, or the MCP server for any MCP-compatible client. Agent OS acts as a kernel layer underneath your agent framework.
 
 **What is the Agent Governance Ecosystem?**
 Agent OS is part of a suite of seven packages: Agent OS (policy engine), [AgentMesh](https://github.com/microsoft/agent-governance-toolkit) (trust infrastructure), [Agent Runtime](https://github.com/microsoft/agent-governance-toolkit) (execution supervisor), [Agent SRE](https://github.com/microsoft/agent-governance-toolkit) (reliability), [Agent Compliance](https://github.com/microsoft/agent-governance-toolkit) (regulatory compliance), [Agent Marketplace](https://github.com/microsoft/agent-governance-toolkit) (plugin lifecycle), and [Agent Lightning](https://github.com/microsoft/agent-governance-toolkit) (RL training governance). Together they provide 4,310+ tests across 17 modules.

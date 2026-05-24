@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-ARG PYTHON_VERSION=3.11
-
+# Python version is pinned in the FROM line below (tag + digest). The image
+# digest is the single source of truth for reproducibility; do not add an ARG
+# here unless it is actually referenced by the FROM line.
 FROM python:3.11-slim@sha256:9358444059ed78e2975ada2c189f1c1a3144a5dab6f35bff8c981afb38946634 AS base
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -14,43 +15,79 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /workspace
 
-RUN apt-get update \
+RUN for i in 1 2 3; do apt-get update && break || sleep 5; done \
     && apt-get install -y --no-install-recommends \
         bash \
         build-essential \
         ca-certificates \
         curl \
         git \
+        gnupg \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
         | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
         > /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update \
+    && for i in 1 2 3; do apt-get update && break || sleep 5; done \
     && apt-get install -y --no-install-recommends nodejs \
     && python -m pip install --upgrade pip==24.3.1 setuptools==75.8.0 wheel==0.45.1 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    # OPA CLI — required by OPAEvaluator local mode (opa eval subprocess)
+    && curl -fsSL -o /usr/local/bin/opa \
+        https://openpolicyagent.org/downloads/v1.4.2/opa_linux_amd64_static \
+    && echo "2c0ccdbbe0b8e2a5d12d9c42d92f1f34f494ffb32d1f3c4ddc36101be637d66f  /usr/local/bin/opa" \
+        | sha256sum -c - \
+    && chmod 755 /usr/local/bin/opa
 
 FROM base AS dev
 
+# Stage 1: TypeScript dependencies cache on package-lock.json alone, so
+# a Python-only source change doesn't trigger a full `npm ci` rebuild
+# (the slowest part of the dev image). Only package-lock.json / package.json
+# changes will invalidate this layer.
+COPY agent-governance-typescript/package.json \
+     agent-governance-typescript/package-lock.json \
+     /workspace/agent-governance-typescript/
+RUN cd /workspace/agent-governance-typescript \
+    && npm ci --legacy-peer-deps
+
+# Stage 2: bring in the full source. Subsequent layers are invalidated
+# by any source change, but the `npm ci` above is preserved.
 COPY . /workspace
 
-# Install local packages (Scorecard: pinned via pyproject.toml)
-# Requirements file dependencies have version constraints
-RUN python -m pip install --no-cache-dir \
+# Stage 3: Python editable installs. A BuildKit cache mount on the pip
+# download cache preserves wheel downloads across rebuilds even when
+# this layer is re-executed (editable installs need source, so the
+# layer itself can't be reused — but the download cache can).
+#
+# Scorecard: pinned via pyproject.toml. Requirements file dependencies
+# have version constraints.
+# Scorecard: editable installs pinned to repo checkout via pyproject.toml
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install \
+        "cedarpy>=4.0.0,<5.0" \
         -e "agent-governance-python/agent-primitives[dev]" \
         -e "agent-governance-python/agent-mcp-governance[dev]" \
-        -e "packages/agent-os[full,dev]" \
-        -e "packages/agent-mesh[agent-os,dev,server]" \
-        -e "packages/agent-hypervisor[api,dev,nexus]" \
-        -e "packages/agent-runtime" \
-        -e "packages/agent-sre[api,dev]" \
-        -e "packages/agent-compliance" \
-        -e "packages/agent-marketplace[cli,dev]" \
-        -e "packages/agent-lightning[agent-os,dev]" \
-    && python -m pip install --no-cache-dir \
-        -r packages/agent-hypervisor/examples/dashboard/requirements.txt \
-    && cd /workspace/agent-governance-typescript \
-    && npm ci
+        -e "agent-governance-python/agent-os[full,dev]" \
+        -e "agent-governance-python/agent-mesh[agent-os,dev,server]" \
+        -e "agent-governance-python/agent-hypervisor[api,dev,nexus]" \
+        -e "agent-governance-python/agent-runtime" \
+        -e "agent-governance-python/agent-sre[api,dev]" \
+        -e "agent-governance-python/agent-compliance" \
+        -e "agent-governance-python/agent-marketplace[cli,dev]" \
+        -e "agent-governance-python/agent-lightning[agent-os,dev]" \
+    && python -m pip install \
+        -r agent-governance-python/agent-hypervisor/examples/dashboard/requirements.txt
+
+# Run as non-root for the developer workflow. The compose `dev` and
+# `dashboard` services bind-mount the repo at /workspace; running the
+# entrypoint as root creates files on the host owned by uid 0, which
+# is both an isolation hazard and an ergonomic problem (host editor
+# can't easily fix permissions). Create the user AFTER the package
+# installs so the system-site-packages writes don't need a sudo step.
+RUN useradd --create-home --shell /bin/bash --uid 1000 dev \
+    && chown -R dev:dev /workspace
+
+USER dev
 
 ENTRYPOINT ["bash", "/workspace/scripts/docker/dev-entrypoint.sh"]
 CMD ["sleep", "infinity"]

@@ -8,17 +8,106 @@ When you submit a pull request, a CLA bot will automatically determine whether y
 CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
 provided by the bot. You will only need to do this once across all repos using our CLA.
 
+### Developer Certificate of Origin (DCO)
+
+In addition to the CLA, all commits must include a `Signed-off-by` trailer certifying that you
+wrote the code or have the right to submit it under the project's license. This is the
+[Developer Certificate of Origin](https://developercertificate.org) (DCO).
+
+To sign off on a commit, use the `-s` flag:
+
+```bash
+git commit -s -m "feat: add new policy engine"
+```
+
+This adds a line like `Signed-off-by: Your Name <your.email@example.com>` to the commit message.
+A CI check will verify that all commits in a pull request include this trailer.
+
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 ## How to Contribute
 
+### Development Environment Setup
+
+**Prerequisites:** Git, Python 3.10+, and optionally Node.js 18+, .NET 8+, Rust 1.75+, or Go 1.21+ depending on what you are working on.
+
+```bash
+# Clone and enter the repo
+git clone https://github.com/microsoft/agent-governance-toolkit.git
+cd agent-governance-toolkit
+```
+
+**Python packages** (most common):
+
+```bash
+cd agent-governance-python
+python -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\Scripts\activate         # Windows
+
+# Install the package you are working on in editable mode
+pip install -e agent-os/[dev]       # Policy engine
+pip install -e agent-mesh/[dev]     # Identity/trust layer
+pip install -e agent-compliance/[dev]  # Compliance tooling
+
+# Run tests for that package
+cd agent-os && pytest
+```
+
+**TypeScript/Node.js:**
+
+```bash
+cd agent-governance-python/agent-mesh/sdks/typescript
+npm install && npm test
+```
+
+**.NET:**
+
+```bash
+cd agent-governance-dotnet
+dotnet build && dotnet test
+```
+
+**Rust:**
+
+```bash
+cd agent-governance-rust
+cargo build && cargo test
+```
+
+**Go:**
+
+```bash
+cd agent-governance-golang
+go build ./... && go test ./...
+```
+
+**Linting:** The CI runs `ruff check` for Python. Run it locally before submitting:
+
+```bash
+ruff check --fix .
+```
+
 ### Reporting Issues
 
 - Search [existing issues](https://github.com/microsoft/agent-governance-toolkit/issues) before creating a new one
 - Use the provided issue templates when available
 - Include reproduction steps, expected behavior, and actual behavior
+
+**Automated and AI-assisted audit findings:**
+
+If you are filing issues from an automated scanner, LLM-assisted code review, or bulk audit
+(e.g. running a tool across the whole repo), please consolidate low-severity findings into a
+single tracking issue with a summary table. One well-prioritized issue is more useful to
+maintainers than a dozen separate filings that each need individual triage.
+
+For high-severity findings (security bugs, data loss risks, correctness issues), individual
+issues are fine and encouraged.
+
+This helps maintainers focus review time on the findings that actually matter and avoids
+burying genuine bugs under a pile of style nits.
 
 ### Pull Requests
 
@@ -42,13 +131,13 @@ term home for that language.
 | If your change is about... | Start here |
 |----------------------------|------------|
 | Published first-party Python packages | `agent-governance-python/` |
-| Core governance/runtime behavior and Python apps | `packages/` |
-| Current shared SDK implementations | `packages/agent-mesh/sdks/` and other languages that still live in the shared layout |
+| Core governance/runtime behavior and Python apps | the repo root |
+| Current shared SDK implementations | `agent-governance-python/agent-mesh/sdks/` and other languages that still live in the shared layout |
 | Standalone language implementations | `agent-governance-python/`, `agent-governance-dotnet/`, `agent-governance-golang/`, or other `agent-governance-*` siblings at the repository root |
 | Tutorials, architecture, package docs | `docs/` |
 | Runnable framework integrations | `examples/` |
-| Interactive or live demos | `demo/` |
-| Azure DevOps publishing/release automation | `pipelines/` |
+| Interactive or live demos | `examples/demos/` |
+| Azure DevOps publishing/release automation | `.github/pipelines/` |
 | GitHub Actions, PR automation, templates | `.github/` |
 
 If a directory contains an `AGENTS.md` file, read it before you start. It captures local
@@ -63,7 +152,7 @@ location. For published Python package work, contributor guidance should point t
 
 - Prefer a docs update when the request is informational.
 - Prefer an `examples/` contribution when proving a new external integration.
-- Prefer `packages/agentmesh-integrations/` when the integration is reusable and maintained.
+- Prefer `agent-governance-python/agentmesh-integrations/` when the integration is reusable and maintained.
 - Propose a core package change only when the functionality clearly belongs in AGT long-term.
 
 ### Attribution & Prior Art
@@ -85,14 +174,89 @@ location. For published Python package work, contributor guidance should point t
 - In code: add a comment like `# Approach adapted from <project> (<license>)`
 - In documentation: include a "Prior art" or "Acknowledgments" section
 
-### AI-Generated Contributions
+### AI-Assisted Contributions
 
-We accept contributions that use AI tools as part of the development process. However:
+We welcome contributions that use AI development tools (copilots, agents, editors, code generators)
+as part of the development process. AI tool usage is treated as part of a contributor's workflow,
+comparable to editors, linters, or language servers. However, AI assistance does not reduce
+contributor responsibility.
 
-- **Disclose AI involvement** if the contribution was substantially generated by an AI tool (e.g., LLM, code generation agent). This is about transparency, not prohibition.
-- **You are responsible for correctness.** AI-generated code must be reviewed, tested, and understood by the contributor before submission. "The AI wrote it" is not a defense for bugs, security issues, or attribution violations.
-- **AI-generated projects require extra scrutiny.** If your PR references a project that appears to be AI-generated (created recently, elaborate documentation but no real users, claims that can't be independently verified), we will evaluate the contribution on its own merits but apply additional review rigor.
-- **Do not use AI tools to generate synthetic community activity** — filing coordinated issues across repos, creating competing projects from existing issue descriptions, or manufacturing the appearance of community adoption. This violates the trust that open-source collaboration depends on.
+**Core principles:**
+
+1. **Take responsibility.** You own every contribution you submit. "The AI wrote it" is not a
+   defense for bugs, security issues, or attribution violations.
+2. **Demonstrate understanding.** You must be able to explain every meaningful change: what it does,
+   why it is designed that way, and what tradeoffs were considered. If you cannot walk through the
+   change, it is not ready for review.
+3. **Respect maintainer time.** AI has lowered the cost of producing contributions but not the cost
+   of reviewing them. Ensure your submission is appropriately scoped, tested, and worth the review
+   effort.
+
+**Requirements for all AI-assisted contributions:**
+
+- Run tests and verification appropriate for the change.
+- Write commit messages that explain what the change does and why. AI-drafted commit messages are
+  acceptable when the contributor has reviewed them and can stand by what they say.
+- Keep PRs appropriately scoped. Avoid large automated refactors unless coordinated with maintainers.
+- Verify that generated code and docs match the current repository state.
+- Do not use AI to launder unattributed derivative work from other projects.
+- Do not use AI to respond to review comments. Reviewers expect to engage with the human author.
+
+**Disclosure:**
+
+Disclosure of AI tool usage is not required by default. Disclosure **is** required in two cases:
+
+1. **Autonomous contributions**: the contribution was produced and submitted by an AI agent acting
+   independently without meaningful human direction or review of the specific output.
+2. **Unreviewed AI-produced content**: the contributor is submitting AI-produced content they have
+   not meaningfully reviewed and cannot fully explain.
+
+In both cases, identify which parts of the submission fall into these categories so reviewers can
+adjust their review accordingly.
+
+**Autonomous contributions are not accepted by default.** All contributions must have a responsible
+human who directed the work and can explain and defend it. The following autonomous agent behaviors
+are not acceptable:
+
+- Agents opening pull requests without a human reviewing the specific changes before submission
+- Agents filing bug reports or feature requests without a human verifying the issue is genuine
+- Agents claiming issues (especially "good first issue") without a human intending to follow through
+- Agents posting unsolicited code review feedback on others' pull requests
+- Agents responding in issue or discussion threads without human oversight of the response
+
+A human using an AI tool to *draft* any of the above, then reviewing, editing, and submitting
+the output themselves, is an AI-assisted contribution and is acceptable.
+
+Authorized bots (Dependabot, Scorecard, CI bots) that predate this policy are governed by their
+own approval processes and are not subject to these restrictions. For the full list of authorized
+bots and how to request authorization for new ones, see
+[docs/policies/autonomous-contributions.md](docs/policies/autonomous-contributions.md).
+
+**Do not use AI tools to generate synthetic community activity**: filing coordinated issues across
+repos, creating competing projects from existing issue descriptions, or manufacturing the appearance
+of community adoption. This violates the trust that open-source collaboration depends on.
+
+**Security considerations:**
+
+Contributions that touch security-sensitive areas (cryptographic implementations, authentication
+logic, input validation, policy enforcement, supply chain tooling) receive heightened review
+regardless of how they were produced. For AI-assisted changes to security-critical code:
+
+- Verify that AI-generated tests are not merely testing the AI-generated implementation against
+  itself. Independent validation is required.
+- Do not include secrets, credentials, or sensitive data in AI tool prompts.
+- Review AI output for hallucinated package names, deprecated crypto algorithms, or insecure
+  defaults.
+
+For detailed checklists and additional requirements, see
+[docs/policies/ai-security-guidance.md](docs/policies/ai-security-guidance.md).
+
+**Legal obligations:**
+
+Contributors using AI development tools must ensure that the tool's terms of service do not conflict
+with the MIT License, and that AI-generated output does not contain copyrighted third-party code
+incompatible with the project's license. When in doubt, review AI output for copied or closely
+adapted snippets and note the source in the PR description.
 
 ### IP, Patents, and Licensing
 
@@ -121,18 +285,6 @@ When in doubt, open an issue or discussion first and describe:
 3. why the change belongs in AGT
 4. whether the first version can live in docs or examples
 
-### AI-Assisted Contributions
-
-AI-assisted contributions are welcome, but they are held to the same standards as any other PR.
-
-- Review, understand, and stand behind every line you submit.
-- Verify that generated code and docs match the current repository state.
-- Disclose meaningful AI assistance in the PR description when it materially shaped the change.
-- Do not use AI to launder unattributed derivative work from other projects.
-- Generated code still needs tests, docs updates, and security review where appropriate.
-- Maintainers may ask contributors to narrow scope, split commits, or rewrite generated changes
-  that are too broad or insufficiently understood.
-
 ### Development Setup
 
 ```bash
@@ -143,15 +295,15 @@ cd agent-governance-toolkit
 # Install in development mode
 pip install -e "agent-governance-python/agent-primitives[dev]"
 pip install -e "agent-governance-python/agent-mcp-governance[dev]"
-pip install -e "packages/agent-os[dev]"
-pip install -e "packages/agent-mesh[dev]"
-pip install -e "packages/agent-runtime[dev]"
-pip install -e "packages/agent-sre[dev]"
-pip install -e "packages/agent-compliance[dev]"
-pip install -e "packages/agent-marketplace[dev]"  # installs agentmesh-marketplace
-pip install -e "packages/agent-lightning[dev]"
-pip install -e "packages/agent-hypervisor[dev]"
-pip install -e "packages/agentmesh-integrations[dev]"
+pip install -e "agent-os[dev]"
+pip install -e "agent-mesh[dev]"
+pip install -e "agent-runtime[dev]"
+pip install -e "agent-sre[dev]"
+pip install -e "agent-compliance[dev]"
+pip install -e "agent-marketplace[dev]"  # installs agentmesh-marketplace
+pip install -e "agent-lightning[dev]"
+pip install -e "agent-hypervisor[dev]"
+pip install -e "agentmesh-integrations[dev]"
 
 # Restore the standalone .NET SDK when working in that path
 dotnet restore agent-governance-dotnet/AgentGovernance.sln
@@ -168,13 +320,17 @@ Python packages in this monorepo, and the TypeScript SDK dependencies.
 
 ```bash
 # Build and start the development container
-docker compose up --build dev
-
-# Open a shell in the running container
-docker compose exec dev bash
+docker compose up --build dev -d
 
 # Run the full test suite
 docker compose run --rm test
+```
+
+To access the container and run commands interactively, use the following command:
+
+```bash
+# Open a shell in the running container
+docker compose exec dev bash
 ```
 
 The repository is bind-mounted into `/workspace`, so Python source changes are
@@ -187,24 +343,74 @@ To launch the optional Agent Hypervisor dashboard:
 docker compose --profile dashboard up --build dashboard
 ```
 
+### Pre-push checklist (recommended)
+
+Run these before pushing a PR. Each step catches a different class of bug
+and has a different cycle-time cost.
+
+**Local prerequisites:**
+
+- **Python 3.10+** (CI tests on 3.10, 3.11, 3.12, and 3.13)
+- **pytest** — `pip install pytest` (or install the package's dev extras)
+- **ruff** — `pip install ruff==0.12.4` (matches `agent-governance-python/requirements/ci-lint.txt`)
+- **Docker** with Compose v2 — required for step 3
+- For a given package, run `pip install -e .` from inside the package
+  directory before its first `pytest`. Sibling packages (e.g.
+  `agent-mesh`) may also need to be installed when their canonical
+  modules are imported by the package under test. Step 3's Docker flow
+  handles this automatically.
+
+1. **Inner loop — test the package you changed:**
+
+   ```bash
+   cd agent-governance-python/<package>
+   pytest tests/ -q
+   ```
+
+   *Cycle time: seconds. Catches: the bug you just wrote.*
+
+2. **Inner loop — lint the package you changed:**
+
+   ```bash
+   ruff check agent-governance-python/<package>/src --select E,F,W --ignore E501
+   ```
+
+   *Cycle time: seconds. Catches: lint failures CI would flag.*
+
+3. **Pre-push integration — run the full Docker test suite:**
+
+   ```bash
+   docker compose up --build dev -d
+   docker compose run --rm test
+   ```
+
+   *Cycle time: ~3 min cold, ~30 s warm. **This catches integration bugs
+   that per-package tests cannot see**, including shim/canonical drift,
+   sibling-package conflicts, Dockerfile drift, and line-ending issues.
+   This is the same flow CI gates on (`docker-compose-test` job).*
+
+4. **Push and let CI handle the rest** — multi-version Python, .NET,
+   TypeScript, Rust, Go, lint, build, security scanners, supply-chain
+   audits. Don't try to replicate all of CI locally.
+
 ### Package Structure
 
 This repo includes these core packages and standalone SDKs today:
 
 | Package | Directory | Description |
 |---------|-----------|-------------|
-| `agent-os-kernel` | `packages/agent-os/` | Kernel architecture for policy enforcement |
-| `agentmesh` | `packages/agent-mesh/` | Inter-agent trust and identity mesh |
-| `agentmesh-runtime` | `packages/agent-runtime/` | Runtime sandboxing and capability isolation |
-| `agent-sre` | `packages/agent-sre/` | Observability, alerting, and reliability |
-| `agent-governance` | `packages/agent-compliance/` | Unified installer and runtime policy enforcement |
-| `agentmesh-marketplace` | `packages/agent-marketplace/` | Plugin lifecycle management for governed agent ecosystems |
-| `agentmesh-lightning` | `packages/agent-lightning/` | RL training governance with governed runners and policy rewards |
-| `agent-hypervisor` | `packages/agent-hypervisor/` | Runtime infrastructure and capability management |
+| `agent-os-kernel` | `agent-governance-python/agent-os/` | Kernel architecture for policy enforcement |
+| `agentmesh` | `agent-governance-python/agent-mesh/` | Inter-agent trust and identity mesh |
+| `agentmesh-runtime` | `agent-governance-python/agent-runtime/` | Runtime sandboxing and capability isolation |
+| `agent-sre` | `agent-governance-python/agent-sre/` | Observability, alerting, and reliability |
+| `agent-governance` | `agent-governance-python/agent-compliance/` | Unified installer and runtime policy enforcement |
+| `agentmesh-marketplace` | `agent-governance-python/agent-marketplace/` | Plugin lifecycle management for governed agent ecosystems |
+| `agentmesh-lightning` | `agent-governance-python/agent-lightning/` | RL training governance with governed runners and policy rewards |
+| `agent-hypervisor` | `agent-governance-python/agent-hypervisor/` | Runtime infrastructure and capability management |
 | `agent-primitives` | `agent-governance-python/agent-primitives/` | Shared foundational Python primitives package |
 | `agent-mcp-governance` | `agent-governance-python/agent-mcp-governance/` | Published MCP governance facade for Python consumers |
 | `agent-governance-dotnet` | `agent-governance-dotnet/` | Standalone .NET SDK for agent governance |
-| `agentmesh-integrations` | `packages/agentmesh-integrations/` | Framework integrations and extension library |
+| `agentmesh-integrations` | `agent-governance-python/agentmesh-integrations/` | Framework integrations and extension library |
 
 Contributor routing for first-party published Python packages should use `agent-governance-python/`
 at the repository root as the canonical path. The standalone .NET SDK should use
@@ -232,7 +438,7 @@ all required CI checks pass.
 Run tests locally with:
 
 ```bash
-cd packages/<package-name>
+cd <package-name>
 pytest tests/ -x -q
 ```
 
@@ -278,10 +484,10 @@ This guide walks you through creating a new framework integration for Agent Gove
 
 ### Integration Package Structure
 
-Each integration is a standalone package under `packages/agentmesh-integrations/`:
+Each integration is a standalone package under `agent-governance-python/agentmesh-integrations/`:
 
 ```
-packages/agentmesh-integrations/your-integration/
+agent-governance-python/agentmesh-integrations/your-integration/
 ├── pyproject.toml          # Package metadata and dependencies
 ├── README.md               # Documentation with quick start
 ├── LICENSE                 # MIT License
@@ -300,7 +506,7 @@ packages/agentmesh-integrations/your-integration/
 3. **TrustedToolExecutor**: Execute tools with verification
 4. **TrustCallbackHandler**: Monitor trust events
 
-See `packages/agentmesh-integrations/langchain-agentmesh/` for the best reference implementation.
+See `agent-governance-python/agentmesh-integrations/langchain-agentmesh/` for the best reference implementation.
 
 ### Writing Tests
 
@@ -342,7 +548,7 @@ Before submitting your integration PR:
 - [ ] `pyproject.toml` includes proper metadata (name, version, description, author)
 - [ ] README.md includes installation instructions and quick start
 - [ ] All public APIs have docstrings
-- [ ] Tests pass: `pytest packages/your-integration/tests/`
+- [ ] Tests pass: `pytest your-integration/tests/`
 - [ ] Code follows PEP 8 and uses type hints
 - [ ] No secrets or credentials committed
 - [ ] Dependencies are pinned to specific versions
@@ -351,7 +557,7 @@ Before submitting your integration PR:
 
 ### Questions?
 
-- Review existing integrations in `packages/agentmesh-integrations/`
+- Review existing integrations in `agent-governance-python/agentmesh-integrations/`
 - Open a [discussion](https://github.com/microsoft/agent-governance-toolkit/discussions) for design questions
 - Tag `@microsoft/agent-governance-team` for integration review
 

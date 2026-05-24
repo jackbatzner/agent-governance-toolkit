@@ -1,0 +1,678 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+"""Tests for AgentMesh Governance module."""
+
+import pytest
+from datetime import datetime, timedelta, timezone
+import tempfile
+import json
+
+from agentmesh.governance import (
+    PolicyEngine,
+    Policy,
+    PolicyRule,
+    ComplianceEngine,
+    ComplianceFramework,
+    AuditLog,
+    AuditChain,
+    ShadowMode,
+)
+
+# For backward compatibility if modules are refactored
+HAS_COMPLIANCE = True
+HAS_AUDIT = True
+HAS_SHADOW = True
+
+
+class TestPolicyEngine:
+    """Tests for PolicyEngine."""
+    
+    def test_create_engine(self):
+        """Test creating policy engine."""
+        engine = PolicyEngine()
+        
+        assert engine is not None
+        assert len(engine.list_policies()) == 0
+    
+    def test_load_policy(self):
+        """Test loading a policy."""
+        engine = PolicyEngine()
+        
+        policy = Policy(
+            name="Test Policy",
+            rules=[
+                PolicyRule(
+                    name="rule-1",
+                    condition="action.type == 'read'",
+                    action="allow",
+                ),
+            ],
+        )
+        
+        engine.load_policy(policy)
+        
+        assert len(engine.list_policies()) == 1
+        assert engine.get_policy("Test Policy") is not None
+    
+    def test_policy_evaluation(self):
+        """Test policy evaluation."""
+        engine = PolicyEngine()
+        
+        policy = Policy(
+            name="Test Policy",
+            agents=["*"],  # Apply to all agents
+            rules=[
+                PolicyRule(
+                    name="block-exports",
+                    condition="action.type == 'export'",
+                    action="deny",
+                    description="Block all exports",
+                ),
+            ],
+            default_action="allow",
+        )
+        engine.load_policy(policy)
+        
+        # Should be blocked
+        result = engine.evaluate(
+            agent_did="did:agentmesh:test",
+            context={"action": {"type": "export"}},
+        )
+        
+        assert result.action == "deny"
+        assert result.allowed is False
+    
+    def test_policy_deterministic(self):
+        """Test that policy evaluation is deterministic."""
+        engine = PolicyEngine()
+        
+        policy = Policy(
+            name="Test Policy",
+            agents=["*"],
+            rules=[
+                PolicyRule(
+                    name="rule-1",
+                    condition="action.type == 'read'",
+                    action="allow",
+                ),
+            ],
+            default_action="deny",
+        )
+        engine.load_policy(policy)
+        
+        context = {"action": {"type": "read"}}
+        
+        # Multiple evaluations should give same result
+        results = [engine.evaluate("did:agentmesh:test", context) for _ in range(10)]
+        
+        assert all(r.action == results[0].action for r in results)
+
+
+class TestCompliance:
+    """Tests for ComplianceEngine."""
+    
+    def test_create_engine(self):
+        """Test creating compliance engine with specific frameworks."""
+        engine = ComplianceEngine([ComplianceFramework.SOC2])
+        
+        assert engine is not None
+        assert ComplianceFramework.SOC2 in engine.frameworks
+    
+    def test_eu_ai_act_mapping(self):
+        """Test EU AI Act compliance mapping."""
+        engine = ComplianceEngine([ComplianceFramework.EU_AI_ACT])
+        
+        mapping = engine.map_action("automated_decision")
+        assert mapping is not None
+        assert any("EUAI" in c for c in mapping.controls)
+    
+    def test_soc2_mapping(self):
+        """Test SOC 2 compliance mapping."""
+        engine = ComplianceEngine([ComplianceFramework.SOC2])
+        
+        mapping = engine.map_action("data_access")
+        assert mapping is not None
+        assert any("SOC2" in c for c in mapping.controls)
+    
+    def test_compliance_report(self):
+        """Test generating compliance report."""
+        engine = ComplianceEngine([ComplianceFramework.SOC2])
+        
+        now = datetime.now(timezone.utc)
+        report = engine.generate_report(
+            framework=ComplianceFramework.SOC2,
+            period_start=now - timedelta(days=30),
+            period_end=now,
+        )
+        
+        assert report is not None
+        assert report.framework == ComplianceFramework.SOC2
+        assert report.total_controls > 0
+        assert 0 <= report.compliance_score <= 100
+    
+    def test_hipaa_violation_detection(self):
+        """Test HIPAA violation detection for unencrypted PHI."""
+        engine = ComplianceEngine([ComplianceFramework.HIPAA])
+        
+        violations = engine.check_compliance(
+            agent_did="did:agentmesh:test-agent",
+            action_type="data_access",
+            context={"data_type": "phi", "encrypted": False},
+        )
+        
+        assert len(violations) > 0
+        assert violations[0].framework == ComplianceFramework.HIPAA
+        assert violations[0].severity == "high"
+    
+    def test_gdpr_consent_violation(self):
+        """Test GDPR violation for missing consent."""
+        engine = ComplianceEngine([ComplianceFramework.GDPR])
+        
+        violations = engine.check_compliance(
+            agent_did="did:agentmesh:test-agent",
+            action_type="data_access",
+            context={"personal_data": True, "consent_verified": False},
+        )
+        
+        assert len(violations) > 0
+        assert violations[0].framework == ComplianceFramework.GDPR
+
+
+class TestAudit:
+    """Tests for AuditLog and AuditChain."""
+    
+    def test_audit_entry(self):
+        """Test creating and logging an audit entry."""
+        audit_log = AuditLog()
+        
+        entry = audit_log.log(
+            event_type="agent_action",
+            agent_did="did:agentmesh:test-agent",
+            action="read_data",
+            resource="/api/data",
+            outcome="success",
+        )
+        
+        assert entry is not None
+        assert entry.event_type == "agent_action"
+        assert entry.agent_did == "did:agentmesh:test-agent"
+        assert entry.entry_hash != ""  # Hash is computed by MerkleAuditChain
+    
+    def test_audit_retrieval(self):
+        """Test retrieving audit entries by agent and type."""
+        audit_log = AuditLog()
+        
+        audit_log.log("action", "did:agentmesh:agent-1", "read")
+        audit_log.log("action", "did:agentmesh:agent-2", "write")
+        audit_log.log("action", "did:agentmesh:agent-1", "delete")
+        
+        agent1_entries = audit_log.get_entries_for_agent("did:agentmesh:agent-1")
+        assert len(agent1_entries) == 2
+        
+        all_entries = audit_log.query(event_type="action")
+        assert len(all_entries) == 3
+    
+    def test_audit_chain(self):
+        """Test append-only audit log."""
+        from agentmesh.governance.audit import AuditEntry
+        
+        chain = AuditChain()
+        
+        entry = AuditEntry(
+            event_type="test",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+        chain.add_entry(entry)
+        
+        # Root hash is computed
+        assert chain.get_root_hash() is not None
+        
+        # Proof is available
+        proof = chain.get_proof(entry.entry_id)
+        assert proof is not None
+    
+    def test_chain_tamper_detection(self):
+        """Test that chain tampering is detected."""
+        audit_log = AuditLog()
+        
+        audit_log.log("action", "did:agentmesh:agent-1", "read")
+        audit_log.log("action", "did:agentmesh:agent-1", "write")
+        audit_log.log("action", "did:agentmesh:agent-1", "delete")
+        
+        # Chain should be valid
+        is_valid, error = audit_log.verify_integrity()
+        assert is_valid is True
+        assert error is None
+    
+    def test_audit_export(self):
+        """Test exporting audit log for external verification."""
+        audit_log = AuditLog()
+
+        audit_log.log("action", "did:agentmesh:agent-1", "read")
+
+        export = audit_log.export()
+        assert export["entry_count"] == 1
+        assert export["chain_root"] is not None  # Merkle root is computed
+
+
+class TestAuditEntryExtensions:
+    """Tests for v1.0 additive audit fields: arguments_hash, approver_did, policy_version.
+
+    These fields are recorded but are NOT yet part of the canonical hash computed
+    by ``AuditEntry.compute_hash()``; spec v1.1 will extend ``MerkleAuditChain``
+    coverage. See ``docs/specs/AUDIT-COMPLIANCE-1.0.md`` §4.3.1.
+    """
+
+    def test_audit_entry_accepts_arguments_hash(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="file_read",
+            arguments_hash="0" * 64,
+        )
+
+        assert entry.arguments_hash == "0" * 64
+
+    def test_audit_entry_accepts_approver_did(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="wire_transfer",
+            approver_did="did:agentmesh:human-reviewer",
+        )
+
+        assert entry.approver_did == "did:agentmesh:human-reviewer"
+
+    def test_audit_entry_accepts_policy_version(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="policy_evaluation",
+            agent_did="did:agentmesh:caller",
+            action="evaluate",
+            policy_version="2026.04.01-abc1234",
+        )
+
+        assert entry.policy_version == "2026.04.01-abc1234"
+
+    def test_new_fields_default_to_none(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+
+        assert entry.arguments_hash is None
+        assert entry.approver_did is None
+        assert entry.policy_version is None
+
+    def test_audit_log_log_passes_through_new_fields(self):
+        audit_log = AuditLog()
+
+        entry = audit_log.log(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="wire_transfer",
+            arguments_hash="abc123" + "0" * 58,
+            approver_did="did:agentmesh:human-reviewer",
+            policy_version="2026.04.01-abc1234",
+        )
+
+        assert entry.arguments_hash == "abc123" + "0" * 58
+        assert entry.approver_did == "did:agentmesh:human-reviewer"
+        assert entry.policy_version == "2026.04.01-abc1234"
+
+    def test_canonical_hash_unchanged_by_new_fields(self):
+        """Backward compat: new fields MUST NOT affect ``compute_hash()`` in v1.0.
+
+        Spec §4.4 fixes the canonical hash field set. The v1.0 canonical form is
+        intentionally unchanged so that previously-persisted entries continue to
+        verify. Spec v1.1 will introduce hash coverage under an explicit
+        schema-version selector. See §4.3.1.
+        """
+        from agentmesh.governance.audit import AuditEntry
+
+        fixed_ts = datetime(2026, 5, 22, 0, 0, 0, tzinfo=timezone.utc)
+
+        baseline = AuditEntry(
+            entry_id="audit_fixed_id_0001",
+            timestamp=fixed_ts,
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+
+        extended = AuditEntry(
+            entry_id="audit_fixed_id_0001",
+            timestamp=fixed_ts,
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+            arguments_hash="deadbeef" * 8,
+            approver_did="did:agentmesh:approver",
+            policy_version="v2.1.0",
+        )
+
+        assert extended.compute_hash() == baseline.compute_hash(), (
+            "v1.0 canonical hash form must not depend on additive fields; "
+            "see spec §4.3.1. Schema v1.1 will introduce hash coverage."
+        )
+
+    def test_cloudevent_serialization_includes_new_fields_when_set(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="wire_transfer",
+            arguments_hash="cafe" * 16,
+            approver_did="did:agentmesh:human-reviewer",
+            policy_version="2026.04.01-abc1234",
+        )
+
+        envelope = entry.to_cloudevent()
+
+        assert envelope["data"]["arguments_hash"] == "cafe" * 16
+        assert envelope["data"]["approver_did"] == "did:agentmesh:human-reviewer"
+        assert envelope["data"]["policy_version"] == "2026.04.01-abc1234"
+
+    def test_cloudevent_serialization_omits_new_fields_when_unset(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+
+        envelope = entry.to_cloudevent()
+
+        assert "arguments_hash" not in envelope["data"]
+        assert "approver_did" not in envelope["data"]
+        assert "policy_version" not in envelope["data"]
+
+    def test_chain_verification_with_new_fields(self):
+        """Chain still verifies when new fields are populated alongside existing ones."""
+        audit_log = AuditLog()
+
+        audit_log.log(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:agent-1",
+            action="read",
+            arguments_hash="abc" + "0" * 61,
+            policy_version="v1.0.0",
+        )
+        audit_log.log(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:agent-1",
+            action="write",
+            arguments_hash="def" + "0" * 61,
+            approver_did="did:agentmesh:approver",
+            policy_version="v1.0.0",
+        )
+
+        is_valid, error = audit_log.verify_integrity()
+        assert is_valid is True
+        assert error is None
+
+
+class TestAuditEntryTemporalExtensions:
+    """Tests for v1.0 additive temporal fields: issued_at, completed_at.
+
+    These fields split the single ``timestamp`` into authorization-time
+    (``issued_at``) and outcome-time (``completed_at``), enabling third-party
+    verifiers to compute execution latency. They are recorded but are NOT yet
+    part of the canonical hash computed by ``AuditEntry.compute_hash()``;
+    spec v1.1 will extend ``MerkleAuditChain`` coverage. See
+    ``docs/specs/AUDIT-COMPLIANCE-1.0.md`` §4.3.1.
+    """
+
+    def test_audit_entry_accepts_issued_at(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        issued = datetime(2026, 5, 22, 12, 0, 0, tzinfo=timezone.utc)
+        entry = AuditEntry(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="wire_transfer",
+            issued_at=issued,
+        )
+
+        assert entry.issued_at == issued
+
+    def test_audit_entry_accepts_completed_at(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        completed = datetime(2026, 5, 22, 12, 0, 5, tzinfo=timezone.utc)
+        entry = AuditEntry(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="wire_transfer",
+            completed_at=completed,
+        )
+
+        assert entry.completed_at == completed
+
+    def test_temporal_fields_default_to_none(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+
+        assert entry.issued_at is None
+        assert entry.completed_at is None
+
+    def test_timestamp_unaffected_by_temporal_fields(self):
+        """``timestamp`` continues to auto-populate; the new fields are additive."""
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+
+        assert entry.timestamp is not None
+        assert entry.timestamp.tzinfo is timezone.utc
+
+    def test_audit_log_log_passes_through_temporal_fields(self):
+        audit_log = AuditLog()
+
+        issued = datetime(2026, 5, 22, 12, 0, 0, tzinfo=timezone.utc)
+        completed = datetime(2026, 5, 22, 12, 0, 5, tzinfo=timezone.utc)
+        entry = audit_log.log(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="wire_transfer",
+            issued_at=issued,
+            completed_at=completed,
+        )
+
+        assert entry.issued_at == issued
+        assert entry.completed_at == completed
+
+    def test_canonical_hash_unchanged_by_temporal_fields(self):
+        """Backward compat: temporal fields MUST NOT affect ``compute_hash()`` in v1.0.
+
+        Spec §4.4 fixes the canonical hash field set. The v1.0 canonical form is
+        intentionally unchanged so that previously-persisted entries continue to
+        verify. Spec v1.1 will introduce hash coverage under an explicit
+        schema-version selector. See §4.3.1.
+        """
+        from agentmesh.governance.audit import AuditEntry
+
+        fixed_ts = datetime(2026, 5, 22, 0, 0, 0, tzinfo=timezone.utc)
+
+        baseline = AuditEntry(
+            entry_id="audit_fixed_id_0002",
+            timestamp=fixed_ts,
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+
+        extended = AuditEntry(
+            entry_id="audit_fixed_id_0002",
+            timestamp=fixed_ts,
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+            issued_at=datetime(2026, 5, 22, 12, 0, 0, tzinfo=timezone.utc),
+            completed_at=datetime(2026, 5, 22, 12, 0, 5, tzinfo=timezone.utc),
+        )
+
+        assert extended.compute_hash() == baseline.compute_hash(), (
+            "v1.0 canonical hash form must not depend on additive fields; "
+            "see spec §4.3.1. Schema v1.1 will introduce hash coverage."
+        )
+
+    def test_cloudevent_serialization_includes_temporal_fields_when_set(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        issued = datetime(2026, 5, 22, 12, 0, 0, tzinfo=timezone.utc)
+        completed = datetime(2026, 5, 22, 12, 0, 5, tzinfo=timezone.utc)
+        entry = AuditEntry(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:caller",
+            action="wire_transfer",
+            issued_at=issued,
+            completed_at=completed,
+        )
+
+        envelope = entry.to_cloudevent()
+
+        assert envelope["data"]["issued_at"] == issued.isoformat()
+        assert envelope["data"]["completed_at"] == completed.isoformat()
+
+    def test_cloudevent_serialization_omits_temporal_fields_when_unset(self):
+        from agentmesh.governance.audit import AuditEntry
+
+        entry = AuditEntry(
+            event_type="action",
+            agent_did="did:agentmesh:test",
+            action="read",
+        )
+
+        envelope = entry.to_cloudevent()
+
+        assert "issued_at" not in envelope["data"]
+        assert "completed_at" not in envelope["data"]
+
+    def test_chain_verification_with_temporal_fields(self):
+        """Chain still verifies when temporal fields are populated."""
+        audit_log = AuditLog()
+
+        audit_log.log(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:agent-1",
+            action="read",
+            issued_at=datetime(2026, 5, 22, 12, 0, 0, tzinfo=timezone.utc),
+            completed_at=datetime(2026, 5, 22, 12, 0, 1, tzinfo=timezone.utc),
+        )
+        audit_log.log(
+            event_type="tool_invocation",
+            agent_did="did:agentmesh:agent-1",
+            action="write",
+            issued_at=datetime(2026, 5, 22, 12, 0, 2, tzinfo=timezone.utc),
+            completed_at=datetime(2026, 5, 22, 12, 0, 3, tzinfo=timezone.utc),
+        )
+
+        is_valid, error = audit_log.verify_integrity()
+        assert is_valid is True
+        assert error is None
+
+
+class TestShadowMode:
+    """Tests for ShadowMode."""
+    
+    def test_create_shadow(self):
+        """Test creating shadow mode session."""
+        engine = PolicyEngine()
+        shadow = ShadowMode(engine)
+        
+        session = shadow.start_session()
+        assert session is not None
+        assert session.active is True
+    
+    def test_shadow_simulation(self):
+        """Test simulating actions in shadow mode."""
+        from agentmesh.governance.shadow import SimulatedAction
+        
+        engine = PolicyEngine()
+        policy = Policy(
+            name="Test Policy",
+            agents=["*"],
+            rules=[
+                PolicyRule(
+                    name="block-exports",
+                    condition="action.type == 'export'",
+                    action="deny",
+                ),
+            ],
+            default_action="allow",
+        )
+        engine.load_policy(policy)
+        
+        shadow = ShadowMode(engine)
+        session = shadow.start_session()
+        
+        action = SimulatedAction(
+            action_id="test-1",
+            agent_did="did:agentmesh:test",
+            action_type="export",
+            context={"action": {"type": "export"}},
+        )
+        
+        result = shadow.evaluate(action)
+        assert result is not None
+        assert result.shadow_allowed is False
+        assert result.shadow_action == "deny"
+    
+    def test_shadow_divergence_report(self):
+        """Test divergence detection between shadow and production."""
+        from agentmesh.governance.shadow import SimulatedAction
+        
+        engine = PolicyEngine()
+        policy = Policy(
+            name="Test Policy",
+            agents=["*"],
+            rules=[
+                PolicyRule(
+                    name="block-exports",
+                    condition="action.type == 'export'",
+                    action="deny",
+                ),
+            ],
+            default_action="allow",
+        )
+        engine.load_policy(policy)
+        
+        shadow = ShadowMode(engine)
+        shadow.start_session()
+        
+        action = SimulatedAction(
+            action_id="test-1",
+            agent_did="did:agentmesh:test",
+            action_type="export",
+            context={"action": {"type": "export"}},
+        )
+        
+        # Simulate with production decision that differs
+        shadow.evaluate(action, production_decision={"allowed": True, "action": "allow"})
+        
+        session = shadow.end_session()
+        assert session.total_evaluated == 1
+        assert session.total_diverged == 1
+        
+        report = shadow.get_divergence_report(session.session_id)
+        assert report["within_target"] is False

@@ -370,7 +370,7 @@ re-verification. Handshakes that exceed the timeout raise
 
 ### 5.3 IATP Protocol Buffer Definitions
 
-IATP is defined in Protocol Buffers (`packages/agent-os/modules/iatp/proto/iatp.proto`).
+IATP is defined in Protocol Buffers (`agent-governance-python/agent-os/modules/iatp/proto/iatp.proto`).
 Key messages:
 
 | Message | Purpose |
@@ -651,4 +651,10 @@ intercepting JSON-RPC 2.0 messages. On every `tools/call`:
 | Trust Bridge | `TrustBridge` | Peer verification with HMAC-protected caching |
 | Protocol Bridge | `ProtocolBridge` | Cross-protocol message translation (A2A ↔ MCP ↔ IATP) |
 
-**Next:** [Tutorial 18 — Compliance Verification](18-compliance-verification.md)
+---
+
+## Next Steps
+
+- [Tutorial 17 -- Advanced Trust & Behavior](17-advanced-trust-and-behavior.md): Dynamic trust scoring and behavioral analysis
+- [Tutorial 18 -- Compliance Verification](18-compliance-verification.md): Automated regulatory compliance checks
+- [Tutorial 44 -- A2A Conversation Policy](44-a2a-conversation-policy.md): Govern A2A conversations with feedback loop prevention

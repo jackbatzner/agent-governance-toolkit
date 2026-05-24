@@ -1,105 +1,109 @@
-# Physical Attestation Governed Example
+# Physical / IoT Sensor Attestation Governance
 
-Ed25519-signed receipts for physical-world sensor events. Every temperature,
-shock, GPS, and light reading from a cold chain attestation sensor is
-policy-evaluated and signed, producing the **same receipt format** used by
-software agent tool calls in the protect-mcp integration (PRs #667 and #1159).
+Demonstrates governance receipts for physical sensor data in supply chain
+and cold chain logistics scenarios. Each sensor reading is policy-checked
+and receipted with tamper-evident hashing for regulatory accountability.
 
-## Background
+## What This Shows
 
-This example was developed as part of an active hardware R&D program
-(Australian ETCF grant, TRL 4 → 6) for a cold chain attestation sensor
-device. The device specification predates this contribution — we're sharing
-it here because the physical AI governance gap identified in #787 is exactly
-the problem we're solving at the hardware level.
+1. **Sensor attestation model** — governance receipts for physical readings
+   (temperature, humidity, GPS, shock/vibration)
+2. **Cedar policy enforcement** — threshold-based permit/forbid rules for
+   cold chain compliance
+3. **Tamper detection** — SHA-256 hashing of reading data and receipt payloads
+4. **Audit trail** — all readings produce receipts regardless of decision
 
-The connection: SINT Protocol's `DynamicEnvelopePlugin` enforces
-`maxVelocityMps` and `maxForceNewtons` inline for robotic actuators.
-Our sensor enforces `temperature_c < 18.0` and `shock_g < 5.0` inline
-for supply chain shipments. Both produce signed receipts that verify with
-the same offline CLI. Same pattern, different domain.
+## Architecture
 
-## Hardware specification
+```
+┌──────────────┐    ┌─────────────────┐    ┌──────────────────┐
+│  IoT Sensor  │───>│  Cedar Policy   │───>│   Attestation    │
+│  (reading)   │    │  Evaluator      │    │   Receipt        │
+└──────────────┘    └─────────────────┘    └──────────────────┘
+                          │                        │
+                    ┌─────┴──────┐          ┌──────┴───────┐
+                    │ Thresholds │          │ Tamper-proof │
+                    │ permit/    │          │ SHA-256 hash │
+                    │ forbid     │          │ chain        │
+                    └────────────┘          └──────────────┘
+```
 
-The simulated sensor matches the ETCF device BOM:
+## Sensor Types and Thresholds
 
-| Component | Part | Role |
-|-----------|------|------|
-| Temperature + humidity | Sensirion SHT40 | ±0.2°C accuracy, 10-90% RH |
-| Accelerometer | ST LIS2DH12 | ±16g range, shock detection |
-| GPS | Quectel L76K | Position + timestamp |
-| Ambient light | Vishay VEML7700 | Sun exposure detection |
-| Secure element | Microchip ATECC608B | Ed25519 key storage + signing |
-| MCU | Nordic nRF52840 | BLE 5.0, 256KB RAM |
-| NFC | NXP NT3H2111 | Tap-to-verify at delivery |
+| Sensor | Safe Range | Violation Action |
+|--------|-----------|------------------|
+| Temperature | -25°C to 8°C | Excursion alert |
+| Humidity | 20% to 80% | Seal breach alert |
+| Shock | ≤ 5.0g | Damage alert |
+| GPS | Any | Always permitted |
 
-BOM target: $14.50 at volume (10K units).
+## Setup
 
-## Scenarios
-
-| # | Scenario | What it demonstrates |
-|---|----------|---------------------|
-| 1 | Cold Chain Journey | 12 readings from Barossa Valley → Tokyo with policy at every step |
-| 2 | Temperature Excursion Blocks Release | 22.4°C triggers deny — shipment release blocked |
-| 3 | Shock Event Creates Alert | 8.7g shock produces signed alert receipt |
-| 4 | Receipt Tamper Detection | Editing any field invalidates the signature |
-| 5 | Chain Integrity Verification | Hash-linked chain detects insertions/deletions |
-| 6 | Multi-Sensor Correlation | Compound event (temp + shock + lux) in single receipt |
-| 7 | Offline Verification | All receipts verify without network |
-| 8 | Device Identity Attestation | Boot receipt proves which hardware produced readings |
-
-## Run
+No dependencies required — uses Python stdlib only.
 
 ```bash
 python examples/physical-attestation-governed/getting_started.py
-# 8 scenarios, 12 journey receipts, all verified
 ```
 
-Zero dependencies beyond Python 3.10+.
+## Expected Output
 
-## Relationship to existing AGT work
+```
+══════════════════════════════════════════════════════════════
+  Physical / IoT Sensor Attestation Governance
+  Cold Chain Monitoring Demo
+══════════════════════════════════════════════════════════════
 
-| PR | What | Relationship |
-|----|------|-------------|
-| #667 | ScopeBlind protect-mcp integration | Software tool-call receipts — the software counterpart |
-| #1159 | protect-mcp governed example | 8 software scenarios — this PR mirrors with 8 physical scenarios |
-| #787 | Physical AI OWASP gap (SINT) | The governance gap this example addresses from the sensor side |
+Cedar policy: cold-chain.cedar
+Shipment: SHIP-2026-04-27-001
+Sensors: 4 devices, 8 readings
 
-The receipt envelope format (`payload` + `signature`, JCS-canonicalized,
-hash-chained via `previousReceiptHash`) is identical across software agent
-and physical sensor receipts. A verifier that handles one handles both:
+Sensor       Type         Value        Decision   Details
+──────────────────────────────────────────────────────────────────────
+  ✅ TEMP-001    temperature  2.3°C        allow      within policy
+  ✅ TEMP-001    temperature  4.1°C        allow      within policy
+  ✅ HUM-001     humidity     45.0%        allow      within policy
+  ✅ GPS-001     gps          40.7128lat   allow      within policy
+  ✅ SHOCK-001   shock        1.2g         allow      within policy
+  🚫 TEMP-001    temperature  12.5°C       deny       Temperature excursion
+  🚫 HUM-001     humidity     92.0%        deny       Humidity outside range
+  🚫 SHOCK-001   shock        8.7g         deny       Shock exceeds threshold
 
-```bash
-npx @veritasacta/verify software-receipts.jsonl --key <agent-key>
-npx @veritasacta/verify sensor-receipts.jsonl --key <device-key>
-# Same CLI, same exit codes, same chain verification
+📊 Attestation Summary:
+   Total readings:     8
+   Compliant:          5
+   Violations:         3
+   Unique sensors:     4
+
+🔐 Tamper Detection:
+   Integrity:    ✅ VERIFIED
+   After tamper: 🚫 DETECTED
 ```
 
-## Policy
+## Files
 
-See `policies/cold-chain-policy.yaml` for the rules. In production firmware,
-these translate to Cedar policies evaluated on the device:
+| File | Purpose |
+|------|---------|
+| `getting_started.py` | Self-contained demo with simulated sensor data |
+| `policies/cold-chain.cedar` | Cedar policy for cold chain thresholds |
 
-```cedar
-forbid (
-    principal,
-    action == Action::"release_shipment",
-    resource
-) when {
-    context.temperature_c > 18.0
-};
-```
+## Use Cases
 
-## Standards
+- **Pharmaceutical cold chain** — FDA 21 CFR Part 11 compliance
+- **Food safety** — HACCP temperature monitoring
+- **Industrial IoT** — equipment vibration governance
+- **Logistics** — shipment integrity verification
 
-- **Ed25519** — RFC 8032 (digital signatures from ATECC608B)
-- **JCS** — RFC 8785 (canonical JSON before signing)
-- **IETF draft-farley-acta-signed-receipts** — receipt wire format
-- **Cedar** — AWS's open authorization engine (device-side policy)
+## Limitations
 
-## Note on demonstration signing
+This example is for **demonstration purposes only**:
 
-This example uses SHA-256 HMAC for signing (no external dependencies).
-Production devices use Ed25519 from the ATECC608B secure element. The
-receipt **envelope format is identical** — only the `signature.alg` field
-changes from `HS256-DEMO` to `EdDSA`.
+- Policy thresholds are hardcoded in Python to keep the example self-contained
+  (no Cedar engine dependency). In production, use the AGT Cedar evaluator.
+- Tamper detection uses SHA-256 hashing without cryptographic signatures.
+  For non-repudiation, combine with the `mcp-receipt-governed` signing adapter.
+- The in-memory receipt list is not persisted. Production deployments should
+  use a durable audit store.
+
+## License
+
+MIT

@@ -11,6 +11,20 @@ Part of the [Agent Governance Toolkit](https://github.com/microsoft/agent-govern
 
 ## Install
 
+Run `dotnet add package` from the directory that contains your `.csproj`. If you're in another folder, pass the project path explicitly:
+
+```bash
+dotnet add YourApp.csproj package Microsoft.AgentGovernance
+```
+
+In Visual Studio Package Manager Console, use `Install-Package` and make sure the correct app is selected in the **Default project** dropdown. Typing a bare package name at the prompt fails because PowerShell treats it as a command.
+
+| Package | .NET CLI | Package Manager Console |
+|---------|----------|-------------------------|
+| Core SDK | `dotnet add package Microsoft.AgentGovernance` | `Install-Package Microsoft.AgentGovernance` |
+| MCP extension | `dotnet add package Microsoft.AgentGovernance.Extensions.ModelContextProtocol` | `Install-Package Microsoft.AgentGovernance.Extensions.ModelContextProtocol` |
+| Microsoft Agents extension | `dotnet add package Microsoft.AgentGovernance.Extensions.Microsoft.Agents` | `Install-Package Microsoft.AgentGovernance.Extensions.Microsoft.Agents` |
+
 ```bash
 dotnet add package Microsoft.AgentGovernance
 ```
@@ -19,6 +33,12 @@ For Model Context Protocol servers built with the official C# SDK:
 
 ```bash
 dotnet add package Microsoft.AgentGovernance.Extensions.ModelContextProtocol
+```
+
+For agents built with the real Microsoft Agent Framework from `microsoft/agent-framework`:
+
+```bash
+dotnet add package Microsoft.AgentGovernance.Extensions.Microsoft.Agents
 ```
 
 ## Quick Start
@@ -413,16 +433,66 @@ kernel.OnAllEvents(evt => auditLog.Append(evt));
 
 ## Microsoft Agent Framework Integration
 
-Works as middleware in MAF / Azure AI Foundry Agent Service:
+`Microsoft.AgentGovernance` stays framework-agnostic. For real MAF agents built with `Microsoft.Agents.AI`, use the companion package `Microsoft.AgentGovernance.Extensions.Microsoft.Agents`.
+
+You can integrate it in two ways:
+
+- **Hook option** - call `WithGovernance(...)` on an existing `AIAgent` or `AIAgentBuilder`
+- **Governance middleware option** - create `AgentFrameworkGovernanceAdapter` explicitly and reuse that adapter anywhere you want the MAF run/function governance bridge
 
 ```csharp
-using AgentGovernance.Integration;
+using AgentGovernance;
+using AgentGovernance.Extensions.Microsoft.Agents;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 
-var middleware = new GovernanceMiddleware(engine, emitter, rateLimiter, metrics);
-var result = middleware.EvaluateToolCall("did:mesh:agent", "database_write", new() { ["table"] = "users" });
+var kernel = new GovernanceKernel(new GovernanceOptions
+{
+    PolicyPaths = new() { "policies/maf.yaml" },
+});
+
+AIAgent agent = GetYourExistingMafAgent();
+
+var governedAgent = agent.WithGovernance(
+    kernel,
+    new AgentFrameworkGovernanceOptions
+    {
+        DefaultAgentId = "did:agentmesh:loan-processor",
+        EnableFunctionMiddleware = true,
+    });
+
+var response = await governedAgent.RunAsync(
+[
+    new ChatMessage(ChatRole.User, "transfer funds")
+]);
 ```
 
-See the [MAF adapter](../../packages/agent-os/src/agent_os/integrations/maf_adapter.py) for the full Python middleware, or the [Foundry integration guide](../../docs/deployment/azure-foundry-agent-service.md) for Azure deployment.
+Or make the governance middleware object explicit:
+
+```csharp
+var adapter = new AgentFrameworkGovernanceAdapter(
+    kernel,
+    new AgentFrameworkGovernanceOptions
+    {
+        DefaultAgentId = "did:agentmesh:loan-processor",
+        EnableFunctionMiddleware = true,
+    });
+
+var governedAgent = agent
+    .AsBuilder()
+    .WithGovernance(adapter)
+    .Build();
+```
+
+This extension adds:
+
+- run-level governance before the inner MAF agent executes
+- optional function-call governance before tool invocation
+- AGT policy, audit, and metrics translation without replacing the MAF runtime
+
+If your MAF agent does not use a function-invocation-capable pipeline, set `EnableFunctionMiddleware = false` and keep only the run hook.
+
+See [Tutorial 43 — .NET MAF Hook Integration](../tutorials/43-dotnet-maf-hook-integration.md) for the hook-by-hook walkthrough, or the [Foundry integration guide](../deployment/azure-foundry-agent-service.md) for Azure deployment.
 
 ## Requirements
 
@@ -440,9 +510,9 @@ The .NET package addresses all 10 OWASP categories:
 | Identity Abuse | DID-based identity + trust scoring + ring demotion |
 | Supply Chain | Build provenance attestation |
 | Code Execution | Rate limiting + ring-based resource limits |
-| Memory Poisoning | Stateless evaluation (no shared context) |
+| Memory & Context Poisoning | Stateless evaluation (no shared context) |
 | Insecure Comms | Cryptographic signing |
-| Cascading Failures | Circuit breaker + SLO error budgets |
+| Cascading Agent Failures | Circuit breaker + SLO error budgets |
 | Trust Exploitation | Saga orchestrator + approval workflows |
 | Rogue Agents | Trust decay + execution ring enforcement + behavioural detection |
 

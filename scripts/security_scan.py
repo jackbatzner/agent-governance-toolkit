@@ -8,7 +8,7 @@ Can be used as a standalone CLI tool, pre-commit hook, or CI step.
 
 Usage:
     # Scan a directory
-    python scripts/security_scan.py packages/agent-os/src/
+    python scripts/security_scan.py agent-governance-python/agent-os/src/
 
     # Scan specific files
     python scripts/security_scan.py path/to/file.py
@@ -17,10 +17,10 @@ Usage:
     python scripts/security_scan.py --staged
 
     # JSON output for CI
-    python scripts/security_scan.py packages/ --format json
+    python scripts/security_scan.py . --format json
 
     # Fail only on critical/high
-    python scripts/security_scan.py packages/ --min-severity high
+    python scripts/security_scan.py . --min-severity high
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from pathlib import Path
 
 # Allow running from repo root without installing
 REPO_ROOT = Path(__file__).resolve().parent.parent
-AGENT_OS_SRC = REPO_ROOT / "packages" / "agent-os" / "src"
+AGENT_OS_SRC = REPO_ROOT / "agent-governance-python" / "agent-os" / "src"
 if AGENT_OS_SRC.exists():
     sys.path.insert(0, str(AGENT_OS_SRC))
 
@@ -139,7 +139,7 @@ def main() -> int:
                 print(f"Warning: {path_str} not found", file=sys.stderr)
     else:
         # Default: scan all packages
-        pkg_dir = REPO_ROOT / "packages"
+        pkg_dir = REPO_ROOT / "agent-governance-python"
         if pkg_dir.exists():
             all_findings.extend(
                 scan_directory(pkg_dir, exclude_tests=args.exclude_tests)

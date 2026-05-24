@@ -1,0 +1,40 @@
+# Customer Support Auto-Responder Agent
+# Production dependencies
+
+# Agent OS
+agent-os-kernel>=0.1.0
+
+# LLM providers
+openai>=1.0.0
+anthropic>=0.18.0
+
+# Ticket systems
+# zendesk-sdk is NOT on PyPI — use 'zenpy' for the Zendesk API client
+zenpy>=2.0.0
+# freshdesk-sdk is NOT on PyPI — use 'freshdesk' for the Freshdesk API client
+freshdesk>=0.1.0
+
+# Knowledge base
+pinecone-client>=3.0.0
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+
+# Database
+sqlalchemy>=2.0.0
+asyncpg>=0.29.0
+
+# Async HTTP
+aiohttp>=3.13.4
+httpx>=0.26.0
+
+# Monitoring
+prometheus-client>=0.19.0
+structlog>=24.1.0
+
+# Rate limiting
+redis>=5.0.0
+aioredis>=2.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0

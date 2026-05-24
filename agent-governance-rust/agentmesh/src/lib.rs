@@ -9,7 +9,7 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use agent_governance::AgentMeshClient;
+//! use agentmesh::AgentMeshClient;
 //!
 //! let client = AgentMeshClient::new("my-agent")
 //!     .expect("failed to create client");
@@ -18,22 +18,104 @@
 //! assert!(result.allowed);
 //! ```
 
+#![cfg_attr(test, allow(deprecated))]
+
 pub mod audit;
+pub mod control_support;
+pub mod governance_support;
 pub mod identity;
+pub mod identity_support;
+pub mod integration_support;
 pub mod lifecycle;
-pub mod mcp;
+/// Deprecated: use the [`agentmesh-mcp`](https://crates.io/crates/agentmesh-mcp) crate directly.
+///
+/// `agentmesh::mcp` is a compatibility re-export of `agentmesh_mcp::mcp` and
+/// will be removed in the next major release. Standardize new code on the
+/// `agentmesh-mcp` crate.
+///
+/// Tracking issue:
+/// <https://github.com/microsoft/agent-governance-toolkit/issues/2013>.
+#[deprecated(
+    since = "3.5.0",
+    note = "use the `agentmesh-mcp` crate directly; `agentmesh::mcp` will be removed in the next major release (see issue #2013)"
+)]
+pub mod mcp {
+    pub use agentmesh_mcp::mcp::*;
+}
 pub mod policy;
+pub mod prompt_injection;
+pub(crate) mod regex_cache;
+pub mod reward_support;
 pub mod rings;
+pub mod sandbox;
+#[cfg(feature = "telemetry")]
+pub mod telemetry;
 pub mod trust;
+pub mod trust_support;
 pub mod types;
 
+pub use agentmesh_mcp::mcp::*;
 pub use audit::AuditLogger;
+pub use control_support::{
+    CircuitBreaker, CircuitState, ErrorBudget, HealthStatus, IncidentRecord, KillSwitch,
+    KillSwitchDecision, KillSwitchEvent, KillSwitchReason, KillSwitchRegistry, KillSwitchScope,
+    ObjectiveEvaluation, ServiceHealthReport, ServiceLevelObjective, SloEngine,
+};
+pub use governance_support::{
+    annex_iv_to_json, annex_iv_to_markdown, load_cedar_into_engine, load_rego_into_engine,
+    ActionRequest, AgentRiskProfile, AnnexIVDocument, AnnexIVSection, AuditChain, AuditSink,
+    AuthorityDecision, AuthorityRequest, CedarDecision, CedarEvaluation, CedarEvaluator,
+    ClassificationResult, ComplianceEngine, ComplianceFramework, ComplianceReport,
+    ComplianceViolation, ConditionOperator, DataClassification, DefaultAuthorityResolver,
+    DelegationInfo, EUAIActRiskClassifier, FederationDecision, FederationEngine, FederationStore,
+    FileAuditSink, FileFederationStore, HashChainVerifier, InMemoryFederationStore, OPADecision,
+    OPAEvaluation, OPAEvaluator, OrgPolicy, OrgPolicyDecision, OrgPolicyRule, OrgTrustAgreement,
+    PolicyBackendDiagnostic, PolicyBackendTrace, PolicyCategory, PolicyDelegation,
+    PolicyDiagnosticSeverity, PolicyEvaluator, PolicyRuleTrace, RiskLevel as GovernanceRiskLevel,
+    ShadowMode, ShadowResult, SignedAuditEntry, TechnicalDocumentationExporter, TrustCondition,
+    TrustDefaults, TrustInfo, TrustPolicy, TrustPolicyDecision, TrustRule,
+};
 pub use identity::{AgentIdentity, PublicIdentity};
+pub use identity_support::{
+    from_jwk, from_jwks, to_jwk, to_jwks, AgentDID, AgentNamespace, Credential, CredentialManager,
+    CredentialStatus, DelegationLink, HumanSponsor, KeyRotationManager, KeyStore, MTLSConfig,
+    MTLSIdentityVerifier, NamespaceManager, NamespaceRule, PKCS11KeyStore, RevocationEntry,
+    RevocationList, RiskLevel, RiskScore as IdentityRiskScore, RiskScorer, RiskSeverity,
+    RiskSignal, SPIFFEIdentity, SPIFFERegistry, ScopeChain, SoftwareKeyStore, SvidType,
+    UserContext, SVID,
+};
+pub use integration_support::{
+    DetectionBasis, DiscoveredAgent, DiscoveryEvidence, DiscoveryInventory,
+    DiscoveryInventorySummary, DiscoveryReconciler, DiscoveryRecord, DiscoveryRiskAssessment,
+    DiscoveryRiskLevel, DiscoveryRiskScorer, DiscoveryScanResult, DiscoveryScanner,
+    DiscoveryStatus, DriftResult, ExecutionRequest, ExecutionResponse, FrameworkAdapter,
+    FrameworkExecutionResult, FrameworkGovernanceAdapter, FrameworkKind, FrameworkResponse,
+    GovernanceEvent, GovernanceEventType, GovernanceHook, GovernanceMiddleware, GovernancePattern,
+    GovernancePolicy, PatternType, ProcessSnapshot, PromptDefenseEvaluator, PromptDefenseFinding,
+    PromptDefenseReport, PromptRiskLevel, RegisteredAgent, ResponseGovernanceAssessment,
+    ShadowAgent,
+};
 pub use lifecycle::{LifecycleEvent, LifecycleManager, LifecycleState};
-pub use mcp::*;
 pub use policy::{PolicyEngine, PolicyError};
+pub use prompt_injection::{
+    AuditRecord as PromptInjectionAuditRecord, DetectionConfig as PromptInjectionDetectionConfig,
+    DetectionOptions as PromptInjectionDetectionOptions, DetectionResult as PromptInjectionResult,
+    InjectionType, PromptInjectionConfig, PromptInjectionDetector, PromptInjectionError,
+    Sensitivity as PromptInjectionSensitivity, ThreatLevel as PromptInjectionThreatLevel,
+};
+pub use reward_support::{
+    AgentRewardState, ContributionWeightedStrategy, DimensionType, DistributionResult,
+    EqualSplitStrategy, HierarchicalStrategy, InteractionEdge, NetworkTrustEngine, ParticipantInfo,
+    RewardAllocation, RewardConfig, RewardDimension, RewardDistributor, RewardEngine, RewardPool,
+    RewardSignal, RewardStrategy, RewardTrustScore, TrustEvent, TrustWeightedStrategy,
+};
 pub use rings::{Ring, RingEnforcer};
 pub use trust::{TrustConfig, TrustManager};
+pub use trust_support::{
+    CapabilityGrant, CapabilityRegistry, CapabilityScope, CardRegistry, HandshakeChallenge,
+    HandshakeResponse, HandshakeResult, HandshakeTrustLevel, PeerInfo, ProtocolBridge, TrustBridge,
+    TrustHandshake, TrustedAgentCard,
+};
 pub use types::{
     AuditEntry, AuditFilter, CandidateDecision, ConflictResolutionStrategy, GovernanceResult,
     PolicyDecision, PolicyScope, ResolutionResult, TrustScore, TrustTier,
@@ -49,6 +131,8 @@ pub struct AgentMeshClient {
     pub trust: TrustManager,
     pub policy: PolicyEngine,
     pub audit: AuditLogger,
+    #[cfg(feature = "telemetry")]
+    telemetry_sink: std::sync::Arc<dyn telemetry::TelemetrySink>,
 }
 
 /// Builder options for [`AgentMeshClient`].
@@ -57,6 +141,8 @@ pub struct ClientOptions {
     pub capabilities: Vec<String>,
     pub trust_config: Option<TrustConfig>,
     pub policy_yaml: Option<String>,
+    #[cfg(feature = "telemetry")]
+    pub telemetry_sink: Option<std::sync::Arc<dyn telemetry::TelemetrySink>>,
 }
 
 impl AgentMeshClient {
@@ -83,6 +169,10 @@ impl AgentMeshClient {
             trust,
             policy,
             audit: AuditLogger::new(),
+            #[cfg(feature = "telemetry")]
+            telemetry_sink: opts
+                .telemetry_sink
+                .unwrap_or_else(|| std::sync::Arc::new(telemetry::NoopTelemetrySink)),
         })
     }
 
@@ -93,7 +183,21 @@ impl AgentMeshClient {
         action: &str,
         context: Option<&HashMap<String, serde_yaml::Value>>,
     ) -> GovernanceResult {
+        #[cfg(feature = "telemetry")]
+        let policy_start = std::time::Instant::now();
         let decision = self.policy.evaluate(action, context);
+        #[cfg(feature = "telemetry")]
+        {
+            let event = telemetry::PolicyTelemetryEvent::new(
+                &self.identity.did,
+                action,
+                &decision,
+                policy_start.elapsed(),
+            );
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                self.telemetry_sink.record_policy_evaluation(&event);
+            }));
+        }
         let audit_entry = self.audit.log(&self.identity.did, action, decision.label());
         let trust_score = self.trust.get_trust_score(&self.identity.did);
 
@@ -235,12 +339,12 @@ policies:
         }
         let entries = client.audit.entries();
         assert_eq!(entries.len(), 5);
-        for i in 0..5 {
-            assert_eq!(entries[i].seq, i as u64);
+        for (i, entry) in entries.iter().enumerate().take(5) {
+            assert_eq!(entry.seq, i as u64);
         }
         // Each entry's prev_hash links to the previous entry's hash
-        for i in 1..5 {
-            assert_eq!(entries[i].previous_hash, entries[i - 1].hash);
+        for window in entries.windows(2) {
+            assert_eq!(window[1].previous_hash, window[0].hash);
         }
         assert!(client.audit.verify());
     }
@@ -291,6 +395,38 @@ policies:
             result.decision,
             PolicyDecision::RequiresApproval(_)
         ));
+    }
+
+    #[test]
+    fn test_approval_required_action_preserves_trust_and_audits_label() {
+        let yaml = r#"
+version: "1.0"
+agent: test
+policies:
+  - name: deploy-gate
+    type: approval
+    actions:
+      - "deploy.*"
+    min_approvals: 2
+"#;
+        let opts = ClientOptions {
+            policy_yaml: Some(yaml.to_string()),
+            ..Default::default()
+        };
+        let client = AgentMeshClient::with_options("approval-audit", opts).unwrap();
+        let did = client.identity.did.clone();
+        let before = client.trust.get_trust_score(&did).score;
+
+        let result = client.execute_with_governance("deploy.production", None);
+        let after = client.trust.get_trust_score(&did).score;
+
+        assert!(!result.allowed);
+        assert!(matches!(
+            result.decision,
+            PolicyDecision::RequiresApproval(_)
+        ));
+        assert_eq!(result.audit_entry.decision, "requires_approval");
+        assert_eq!(after, before);
     }
 
     #[test]
