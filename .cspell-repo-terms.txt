@@ -25,6 +25,7 @@ appsettings
 argparse
 asctime
 aspnet
+asynccontextmanager
 asyncio
 atexit
 autobuild
@@ -64,6 +65,7 @@ CommonMark
 comspec
 containerapps
 containerd
+contextlib
 contoso
 coro
 Cpus
@@ -98,6 +100,7 @@ digestmod
 dnssec
 Dockerfiles
 Docstrings
+doesnotexist
 DOTALL
 dpkg
 eastus
@@ -115,6 +118,7 @@ Errorf
 esrp
 EUAI
 evilpypi
+exfiltrated
 exfiltration
 expanduser
 fastapi
@@ -172,6 +176,7 @@ imran
 inheritdoc
 inspectable
 IPFS
+isfinite
 isinstance
 isoformat
 isort
@@ -226,6 +231,7 @@ myapp
 mynamespace
 mypod
 mypy
+nacl
 nameof
 Nanvix
 nargs
@@ -361,6 +367,7 @@ sybil
 syscall
 syscalls
 SYSTEMROOT
+testclient
 textwrap
 thiserror
 timedelta
@@ -376,6 +383,7 @@ unconfigured
 Ungated
 uninspectable
 Unmarshal
+unredacted
 Unregisters
 unrevocation
 unrevoke
